@@ -237,6 +237,9 @@ export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONUNBUFFERED=1
 
+# Ensure ubuntu user .local/bin is in PATH
+export PATH="$HOME/.local/bin:/home/ubuntu/.local/bin:$PATH"
+
 # Setup-specific environment
 export SETUP_USER=1
 EOF

@@ -68,7 +68,11 @@ install_zsh() {
 install_oh_my_zsh() {
     log_subsection "Installing Oh My Zsh"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         install_oh_my_zsh_for_user "$username"
@@ -149,7 +153,11 @@ install_oh_my_zsh_for_user() {
 configure_zsh_for_users() {
     log_subsection "Configuring Zsh"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         configure_zsh_for_user "$username"
@@ -253,8 +261,8 @@ export PATH="\$NPM_CONFIG_PREFIX/bin:\$PATH"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONUNBUFFERED=1
 
-# Add user bin directories to PATH
-export PATH="\$HOME/bin:\$HOME/.local/bin:\$PATH"
+# Add user bin directories to PATH (including ubuntu user)
+export PATH="\$HOME/bin:\$HOME/.local/bin:/home/ubuntu/.local/bin:\$PATH"
 
 # Custom aliases
 alias ll='ls -alF'
@@ -412,7 +420,12 @@ install_autosuggestions_plugin() {
 set_default_shells() {
     log_subsection "Setting Default Shells"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
+    
     local zsh_path
     zsh_path=$(which zsh)
     
@@ -450,7 +463,12 @@ set_user_shell() {
 verify_shell_setup() {
     log_subsection "Verifying Shell Setup"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
+    
     local failed_users=()
     
     for username in "${users[@]}"; do

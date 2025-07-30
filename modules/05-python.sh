@@ -124,6 +124,9 @@ setup_python_alternatives() {
         log_warn "Neither Python ${PYTHON_VERSION} nor system Python3 found"
         log_warn "Python alternatives not configured, continuing anyway"
     fi
+    
+    # Create python -> python3 alias/symlink
+    setup_python_alias
 }
 
 # Verify Python installation
@@ -177,12 +180,25 @@ configure_pip() {
 upgrade_pip() {
     log_info "Upgrading pip to latest version"
     
-    if python3 -m pip install --upgrade pip > /dev/null 2>&1; then
+    # Use more robust pip upgrade with better error handling
+    local pip_upgrade_output
+    if pip_upgrade_output=$(python3 -m pip install --upgrade pip --no-warn-script-location 2>&1); then
         local pip_version
         pip_version=$(pip3 --version | awk '{print $2}')
         log_success "pip upgraded to: v$pip_version"
     else
-        log_warn "Failed to upgrade pip"
+        log_warn "Failed to upgrade pip: $pip_upgrade_output"
+        # Fallback: try with --break-system-packages if needed
+        if echo "$pip_upgrade_output" | grep -q "externally-managed"; then
+            log_info "Attempting pip upgrade with --break-system-packages flag"
+            if python3 -m pip install --upgrade pip --break-system-packages --no-warn-script-location > /dev/null 2>&1; then
+                local pip_version
+                pip_version=$(pip3 --version | awk '{print $2}')
+                log_success "pip upgraded to: v$pip_version (with --break-system-packages)"
+            else
+                log_warn "pip upgrade failed even with --break-system-packages"
+            fi
+        fi
     fi
 }
 
@@ -201,9 +217,15 @@ configure_pip_settings() {
 cache-dir = /var/cache/pip
 disable-pip-version-check = true
 timeout = 60
+no-warn-script-location = true
+no-warn-conflicts = false
 
 [install]
-use-feature = 2020-resolver
+trusted-host = pypi.org
+              pypi.python.org
+              files.pythonhosted.org
+break-system-packages = false
+user = false
 EOF
     
     chmod 644 "$pip_conf"
@@ -230,11 +252,22 @@ install_python_packages() {
     
     for package in "${packages[@]}"; do
         log_info "Installing package: $package"
-        if python3 -m pip install --upgrade "$package" > /dev/null 2>&1; then
+        local install_output
+        if install_output=$(python3 -m pip install --upgrade "$package" --no-warn-script-location 2>&1); then
             log_success "Installed: $package"
         else
-            log_warn "Failed to install: $package"
-            failed_packages+=("$package")
+            log_warn "Failed to install: $package - $install_output"
+            # Try with --break-system-packages if it's an externally-managed environment
+            if echo "$install_output" | grep -q "externally-managed"; then
+                log_info "Retrying $package with --break-system-packages"
+                if python3 -m pip install --upgrade "$package" --break-system-packages --no-warn-script-location > /dev/null 2>&1; then
+                    log_success "Installed: $package (with --break-system-packages)"
+                else
+                    failed_packages+=("$package")
+                fi
+            else
+                failed_packages+=("$package")
+            fi
         fi
     done
     
@@ -256,7 +289,11 @@ install_python_packages() {
 create_virtual_environments() {
     log_subsection "Creating Virtual Environments"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         create_user_virtual_environments "$username"
@@ -315,7 +352,11 @@ create_user_virtual_environments() {
 configure_python_for_users() {
     log_subsection "Configuring Python for Users"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         configure_python_for_user "$username"
@@ -361,10 +402,15 @@ create_user_pip_config() {
 cache-dir = ${home_dir}/.cache/pip
 disable-pip-version-check = true
 timeout = 60
+no-warn-script-location = true
+no-warn-conflicts = false
 
 [install]
 user = true
-use-feature = 2020-resolver
+trusted-host = pypi.org
+              pypi.python.org
+              files.pythonhosted.org
+break-system-packages = false
 EOF
     
     chown "$username:$username" "$pip_config"
@@ -491,8 +537,8 @@ export PYTHONPATH="$HOME/.local/lib/python3/site-packages:$PYTHONPATH"
 # Python user base
 export PYTHON_USER_BASE="$HOME/.local"
 
-# Add user's Python bin to PATH
-export PATH="$HOME/.local/bin:$PATH"
+# Add user's Python bin to PATH (including ubuntu user)
+export PATH="$HOME/.local/bin:/home/ubuntu/.local/bin:$PATH"
 
 # Python environment variables
 export PYTHONDONTWRITEBYTECODE=1
@@ -504,6 +550,7 @@ alias deactivate='deactivate'
 
 # Python development aliases
 alias py='python3'
+alias python='python3'
 alias pip='pip3'
 alias python-server='python3 -m http.server'
 alias python-json='python3 -m json.tool'
@@ -605,6 +652,29 @@ verify_python_environment() {
     fi
     
     log_success "Python environment verification completed"
+}
+
+# Set up python alias for python3
+setup_python_alias() {
+    log_info "Setting up python alias for python3"
+    
+    # Create system-wide python alias using alternatives
+    if command -v python3 > /dev/null 2>&1; then
+        local python3_path
+        python3_path=$(which python3)
+        
+        # Set up alternatives for python command to point to python3
+        update-alternatives --install /usr/bin/python python "$python3_path" 1 > /dev/null 2>&1 || true
+        
+        # Verify the alias works
+        if command -v python > /dev/null 2>&1 && [[ "$(python --version 2>&1)" =~ Python\ 3 ]]; then
+            log_success "python alias configured to point to python3"
+        else
+            log_warn "python alias setup may have failed, but continuing"
+        fi
+    else
+        log_warn "python3 not found, cannot create python alias"
+    fi
 }
 
 # Module cleanup on exit - make non-fatal
