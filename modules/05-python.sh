@@ -34,25 +34,31 @@ main() {
 add_deadsnakes_ppa() {
     log_subsection "Adding Deadsnakes PPA"
     
-    # Check if PPA is already added
-    if grep -q "deadsnakes" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+    # Check if PPA is already added (multiple ways)
+    if grep -q "deadsnakes" /etc/apt/sources.list.d/*.list 2>/dev/null || \
+       apt-cache policy | grep -q "deadsnakes" 2>/dev/null; then
         log_debug "Deadsnakes PPA already added"
         return 0
     fi
     
     log_info "Adding deadsnakes PPA for Python $PYTHON_VERSION"
     
-    # Add PPA
-    if add-apt-repository -y "$DEADSNAKES_PPA" > /dev/null 2>&1; then
+    # Try to add PPA with better error handling
+    local ppa_output
+    if ppa_output=$(add-apt-repository -y "$DEADSNAKES_PPA" 2>&1); then
         log_success "Deadsnakes PPA added successfully"
     else
-        log_error "Failed to add deadsnakes PPA"
-        return 1
+        log_warn "Failed to add deadsnakes PPA: $ppa_output"
+        log_warn "Continuing with system Python packages..."
+        return 0  # Don't fail the entire module
     fi
     
     # Update package lists
-    apt-get update > /dev/null 2>&1
-    log_success "Package lists updated"
+    if apt-get update > /dev/null 2>&1; then
+        log_success "Package lists updated"
+    else
+        log_warn "Package list update had issues, continuing anyway"
+    fi
 }
 
 # Install Python
