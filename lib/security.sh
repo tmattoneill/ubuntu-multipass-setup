@@ -221,7 +221,6 @@ harden_ssh_config() {
         "MaxAuthTries 3"
         "MaxSessions 2"
         "LoginGraceTime 30"
-        "AllowUsers ${PRIMARY_USER} ${DEFAULT_DEPLOY_USER}"
     )
     
     # Apply settings
@@ -241,29 +240,7 @@ harden_ssh_config() {
         systemctl reload ssh > /dev/null 2>&1 || systemctl reload sshd > /dev/null 2>&1 || true
         return 0
     else
-        log_warn "SSH configuration validation failed, checking if users exist"
-        
-        # Check if the allowed users actually exist
-        local ssh_users_exist=true
-        if ! user_exists "$PRIMARY_USER"; then
-            log_warn "PRIMARY_USER '$PRIMARY_USER' does not exist, removing from AllowUsers"
-            sed -i "/AllowUsers.*$PRIMARY_USER/d" "$ssh_config"
-            ssh_users_exist=false
-        fi
-        if ! user_exists "$DEFAULT_DEPLOY_USER"; then
-            log_warn "DEFAULT_DEPLOY_USER '$DEFAULT_DEPLOY_USER' does not exist, removing from AllowUsers"
-            sed -i "/AllowUsers.*$DEFAULT_DEPLOY_USER/d" "$ssh_config"
-            ssh_users_exist=false
-        fi
-        
-        # Try validation again without AllowUsers if users don't exist
-        if [[ "$ssh_users_exist" == "false" ]]; then
-            if sshd -t > /dev/null 2>&1; then
-                log_success "SSH configuration hardened (without user restrictions)"
-                systemctl reload ssh > /dev/null 2>&1 || systemctl reload sshd > /dev/null 2>&1 || true
-                return 0
-            fi
-        fi
+        log_warn "SSH configuration validation failed, trying to fix"
         
         log_warn "SSH configuration validation still failed, restoring backup"
         restore_file "$backup_file" "$ssh_config"
