@@ -346,50 +346,26 @@ create_performance_config() {
     log_debug "Creating performance configuration"
     
     cat > "$perf_conf" << 'EOF'
-# Performance configuration
+# Performance configuration for server blocks
+# Note: Global directives like sendfile, gzip are already set in nginx.conf
 
-# Enable efficient file serving
-sendfile on;
-tcp_nopush on;
-tcp_nodelay on;
+# This file contains server-level performance settings that can be
+# included in server blocks or used as global http-level includes
 
-# Optimize worker processes
-worker_rlimit_nofile 65535;
-
-# Enable gzip compression
-gzip on;
-gzip_vary on;
-gzip_min_length 1024;
-gzip_proxied any;
-gzip_comp_level 6;
-gzip_types
-    text/plain
-    text/css
-    text/xml
-    text/javascript
-    text/x-component
-    application/json
-    application/javascript
-    application/x-javascript
-    application/xml
-    application/xml+rss
-    application/rss+xml
-    application/atom+xml
-    image/svg+xml;
-
-# Cache static files
-location ~* \.(jpg|jpeg|png|gif|ico|css|js|pdf|zip|tar|gz)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-    add_header X-Cache-Status "STATIC";
+# Map for caching headers
+map $sent_http_content_type $expires {
+    default                    off;
+    text/html                  1h;
+    text/css                   1y;
+    application/javascript     1y;
+    ~image/                    1y;
 }
 
-# Cache HTML files for a shorter time
-location ~* \.(html|htm)$ {
-    expires 1h;
-    add_header Cache-Control "public";
-    add_header X-Cache-Status "HTML";
-}
+# Rate limiting for different endpoints
+limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+
+# This file is included in the http block, so only http-level directives
+# Location blocks would go in individual server configurations
 EOF
     
     chmod 644 "$perf_conf"
