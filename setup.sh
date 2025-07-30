@@ -257,11 +257,8 @@ validate_system() {
         exit 1
     fi
     
-    # Check available disk space
-    if ! validate_disk_space; then
-        log_error "Insufficient disk space. At least ${MIN_DISK_SPACE}GB required."
-        exit 1
-    fi
+    # Check available disk space (warns but doesn't fail)
+    validate_disk_space
     
     # Validate system architecture
     if ! validate_architecture; then

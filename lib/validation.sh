@@ -69,8 +69,9 @@ validate_disk_space() {
         log_success "Disk space validation passed: ${available_space}GB available"
         return 0
     else
-        log_error "Disk space validation failed: ${available_space}GB < ${required_space}GB"
-        return 1
+        log_warn "Disk space warning: ${available_space}GB < ${required_space}GB recommended"
+        log_warn "Installation may fail if disk space runs out during setup"
+        return 0  # Don't fail - just warn
     fi
 }
 
