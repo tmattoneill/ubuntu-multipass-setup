@@ -262,43 +262,22 @@ create_security_config() {
     log_debug "Creating security configuration"
     
     cat > "$security_conf" << 'EOF'
-# Security configuration
+# Security configuration (additional settings not in main nginx.conf)
+# Note: server_tokens, security headers, client_max_body_size already set in nginx.conf
+# Note: location blocks belong in server configurations, not conf.d includes
 
-# Hide Nginx version
-server_tokens off;
-
-# Prevent access to hidden files
-location ~ /\. {
-    deny all;
-    access_log off;
-    log_not_found off;
-}
-
-# Prevent access to backup files
-location ~ ~$ {
-    deny all;
-    access_log off;
-    log_not_found off;
-}
-
-# Security headers
-add_header X-Frame-Options DENY always;
-add_header X-Content-Type-Options nosniff always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Content-Security-Policy "default-src 'self'" always;
-
-# Limit request size
-client_max_body_size 64M;
-
-# Prevent buffer overflow attacks
+# Additional security settings for http block
+# Prevent buffer overflow attacks  
 client_body_buffer_size 1K;
 client_header_buffer_size 1k;
 large_client_header_buffers 2 1k;
 
-# Rate limiting
+# Rate limiting status codes
 limit_req_status 429;
 limit_conn_status 429;
+
+# Additional security maps can be added here
+# Most security directives are already configured in main nginx.conf
 EOF
     
     chmod 644 "$security_conf"
