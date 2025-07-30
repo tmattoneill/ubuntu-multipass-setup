@@ -348,6 +348,7 @@ create_performance_config() {
     cat > "$perf_conf" << 'EOF'
 # Performance configuration for server blocks
 # Note: Global directives like sendfile, gzip are already set in nginx.conf
+# Note: Rate limiting zones (login, api) are already set in nginx.conf
 
 # This file contains server-level performance settings that can be
 # included in server blocks or used as global http-level includes
@@ -361,11 +362,8 @@ map $sent_http_content_type $expires {
     ~image/                    1y;
 }
 
-# Rate limiting for different endpoints
-limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
-
-# This file is included in the http block, so only http-level directives
-# Location blocks would go in individual server configurations
+# Additional performance maps can be added here
+# Rate limiting zones are already configured in main nginx.conf
 EOF
     
     chmod 644 "$perf_conf"
