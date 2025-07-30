@@ -1,0 +1,11 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+runcmd:
+  - |
+    wget https://raw.githubusercontent.com/tmattoneill/ubuntu-multipass-setup/main/tools/quick-start.sh
+    chmod +x quick-start.sh
+    ./quick-start.sh --remote --verbose
+
+final_message: "Setup complete! Connect with: multipass shell $INSTANCE"

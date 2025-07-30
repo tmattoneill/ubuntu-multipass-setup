@@ -156,12 +156,12 @@ validate_security_configuration() {
     if ! ufw status | grep -q "Status: active"; then
         security_issues+=("UFW firewall is not active")
     else
-        log_success("UFW firewall is active")
+        log_success "UFW firewall is active"
     fi
     
     # Check fail2ban status
     if systemctl is-active --quiet fail2ban; then
-        log_success("Fail2ban is running")
+        log_success "Fail2ban is running"
     else
         security_issues+=("Fail2ban is not running")
     fi
@@ -170,13 +170,13 @@ validate_security_configuration() {
     local ssh_config="/etc/ssh/sshd_config"
     if [[ -f "$ssh_config" ]]; then
         if grep -q "PermitRootLogin no" "$ssh_config"; then
-            log_success("SSH root login disabled")
+            log_success "SSH root login disabled"
         else
             security_issues+=("SSH root login not disabled")
         fi
         
         if grep -q "PasswordAuthentication no" "$ssh_config"; then
-            log_success("SSH password authentication disabled")
+            log_success "SSH password authentication disabled"
         else
             security_issues+=("SSH password authentication not disabled")
         fi
@@ -236,7 +236,7 @@ validate_performance_settings() {
     local swappiness
     swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null || echo "60")
     if [[ $swappiness -eq $SWAPPINESS ]]; then
-        log_success("Swappiness correctly set to: $swappiness")
+        log_success "Swappiness correctly set to: $swappiness"
     else
         performance_issues+=("Swappiness not optimal: $swappiness (expected: $SWAPPINESS)")
     fi
@@ -245,7 +245,7 @@ validate_performance_settings() {
     local tcp_cc
     tcp_cc=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "unknown")
     if [[ "$tcp_cc" == "bbr" ]] || [[ "$tcp_cc" == "cubic" ]]; then
-        log_success("TCP congestion control: $tcp_cc")
+        log_success "TCP congestion control: $tcp_cc"
     else
         performance_issues+=("TCP congestion control not optimal: $tcp_cc")
     fi
@@ -265,7 +265,7 @@ validate_performance_settings() {
     # Check systemd limits
     if [[ -f /etc/systemd/system.conf ]]; then
         if grep -q "DefaultLimitNOFILE=$SYSTEMD_DEFAULT_LIMIT_NOFILE" /etc/systemd/system.conf; then
-            log_success("Systemd file limits configured")
+            log_success "Systemd file limits configured"
         else
             performance_issues+=("Systemd file limits not configured")
         fi
@@ -313,7 +313,7 @@ validate_user_environments() {
         for config in "${shell_configs[@]}"; do
             if [[ -f "$home_dir/$config" ]]; then
                 has_shell_config=true
-                log_success("Shell configuration found: $home_dir/$config")
+                log_success "Shell configuration found: $home_dir/$config"
                 break
             fi
         done
@@ -327,7 +327,7 @@ validate_user_environments() {
             local ssh_perms
             ssh_perms=$(stat -c "%a" "$home_dir/.ssh")
             if [[ "$ssh_perms" == "700" ]]; then
-                log_success("SSH directory permissions correct: $username")
+                log_success "SSH directory permissions correct: $username"
             else
                 user_issues+=("Incorrect SSH directory permissions for $username: $ssh_perms")
             fi
@@ -337,7 +337,7 @@ validate_user_environments() {
         local user_groups
         user_groups=$(groups "$username" 2>/dev/null || echo "")
         if echo "$user_groups" | grep -q "$WEBAPP_GROUP"; then
-            log_success("User in webapp group: $username")
+            log_success "User in webapp group: $username"
         else
             user_issues+=("User not in webapp group: $username")
         fi
@@ -345,7 +345,7 @@ validate_user_environments() {
     
     # Report user validation results
     if [[ ${#user_issues[@]} -eq 0 ]]; then
-        log_success("User environment validation passed")
+        log_success "User environment validation passed"
     else
         log_warn "User environment issues found:"
         for issue in "${user_issues[@]}"; do
@@ -381,7 +381,7 @@ test_web_server() {
         http_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || echo "000")
         
         if [[ "$http_response" == "200" ]]; then
-            log_success("Web server HTTP test passed")
+            log_success "Web server HTTP test passed"
         else
             log_warn "Web server HTTP test failed: HTTP $http_response"
         fi
@@ -391,14 +391,14 @@ test_web_server() {
         health_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/health 2>/dev/null || echo "000")
         
         if [[ "$health_response" == "200" ]]; then
-            log_success("Web server health endpoint test passed")
+            log_success "Web server health endpoint test passed"
         else
             log_warn "Web server health endpoint test failed: HTTP $health_response"
         fi
         
         # Test configuration
         if nginx -t > /dev/null 2>&1; then
-            log_success("Nginx configuration test passed")
+            log_success "Nginx configuration test passed"
         else
             log_error "Nginx configuration test failed"
         fi
@@ -416,7 +416,7 @@ test_development_environments() {
         if source "$NVM_DIR/nvm.sh" && node --version > /dev/null 2>&1; then
             local node_version
             node_version=$(node --version)
-            log_success("Node.js environment test passed: $node_version")
+            log_success "Node.js environment test passed: $node_version"
         else
             log_warn "Node.js environment test failed"
         fi
@@ -424,7 +424,7 @@ test_development_environments() {
         if npm --version > /dev/null 2>&1; then
             local npm_version
             npm_version=$(npm --version)
-            log_success("npm test passed: v$npm_version")
+            log_success "npm test passed: v$npm_version"
         else
             log_warn "npm test failed"
         fi
@@ -436,12 +436,12 @@ test_development_environments() {
     if command_exists "python3"; then
         local python_version
         python_version=$(python3 --version)
-        log_success("Python environment test passed: $python_version")
+        log_success "Python environment test passed: $python_version"
         
         if command_exists "pip3"; then
             local pip_version
             pip_version=$(pip3 --version | awk '{print $2}')
-            log_success("pip test passed: v$pip_version")
+            log_success "pip test passed: v$pip_version"
         else
             log_warn "pip test failed"
         fi
@@ -452,7 +452,7 @@ test_development_environments() {
     # Test virtual environment creation
     local test_venv="/tmp/test-validation-venv-$$"
     if python3 -m venv "$test_venv" > /dev/null 2>&1; then
-        log_success("Python virtual environment test passed")
+        log_success "Python virtual environment test passed"
         rm -rf "$test_venv"
     else
         log_warn "Python virtual environment test failed"
@@ -465,7 +465,7 @@ test_security_features() {
     
     # Test firewall
     if ufw status | grep -q "Status: active"; then
-        log_success("Firewall test passed")
+        log_success "Firewall test passed"
     else
         log_warn "Firewall test failed: not active"
     fi
@@ -475,9 +475,9 @@ test_security_features() {
         if command_exists "fail2ban-client"; then
             local fail2ban_status
             fail2ban_status=$(fail2ban-client status 2>/dev/null | grep "Number of jail" || echo "unknown")
-            log_success("Fail2ban test passed: $fail2ban_status")
+            log_success "Fail2ban test passed: $fail2ban_status"
         else
-            log_success("Fail2ban service test passed")
+            log_success "Fail2ban service test passed"
         fi
     else
         log_warn "Fail2ban test failed: not running"
@@ -485,7 +485,7 @@ test_security_features() {
     
     # Test SSH configuration
     if sshd -t > /dev/null 2>&1; then
-        log_success("SSH configuration test passed")
+        log_success "SSH configuration test passed"
     else
         log_warn "SSH configuration test failed"
     fi
@@ -499,7 +499,7 @@ test_monitoring_logging() {
     local log_dirs=("/var/log" "/var/log/nginx")
     for log_dir in "${log_dirs[@]}"; do
         if [[ -d "$log_dir" ]] && [[ -w "$log_dir" ]]; then
-            log_success("Log directory test passed: $log_dir")
+            log_success "Log directory test passed: $log_dir"
         else
             log_warn "Log directory test failed: $log_dir"
         fi
@@ -513,7 +513,7 @@ test_monitoring_logging() {
     
     for script in "${monitor_scripts[@]}"; do
         if [[ -x "$script" ]]; then
-            log_success("Monitoring script test passed: $script")
+            log_success "Monitoring script test passed: $script"
         else
             log_warn "Monitoring script test failed: $script"
         fi
@@ -521,7 +521,7 @@ test_monitoring_logging() {
     
     # Test cron jobs
     if crontab -l 2>/dev/null | grep -q "system-health"; then
-        log_success("Monitoring cron jobs test passed")
+        log_success "Monitoring cron jobs test passed"
     else
         log_warn "Monitoring cron jobs test failed"
     fi
@@ -554,7 +554,7 @@ cleanup_installation_artifacts() {
         DEBIAN_FRONTEND=noninteractive apt-get autoremove --purge -y > /dev/null 2>&1 || true
         log_success "Old kernels cleaned up"
     else
-        log_debug("Kernel cleanup not needed")
+        log_debug "Kernel cleanup not needed"
     fi
     
     # Clean log files older than 30 days

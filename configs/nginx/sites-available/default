@@ -1,0 +1,89 @@
+# Default Server Configuration
+# Template for basic web server setup
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    # Server Configuration
+    server_name _;
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+
+    # Security settings
+    server_tokens off;
+    
+    # Rate limiting for login endpoints
+    location /login {
+        limit_req zone=login burst=5 nodelay;
+        try_files $uri $uri/ =404;
+    }
+    
+    # API rate limiting
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        try_files $uri $uri/ =404;
+    }
+
+    # Static file handling
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Security headers for all responses
+    location / {
+        try_files $uri $uri/ =404;
+        
+        # Additional security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+    }
+
+    # Hide sensitive files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    
+    location ~ ~$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /var/www/html;
+    }
+}
+
+# SSL Configuration Template (uncomment and configure when SSL is available)
+#server {
+#    listen 443 ssl http2 default_server;
+#    listen [::]:443 ssl http2 default_server;
+#    
+#    server_name example.com www.example.com;
+#    root /var/www/html;
+#    index index.html index.htm;
+#
+#    # SSL Configuration
+#    ssl_certificate /path/to/certificate.crt;
+#    ssl_certificate_key /path/to/private.key;
+#    ssl_session_cache shared:SSL:1m;
+#    ssl_session_timeout 5m;
+#    ssl_protocols TLSv1.2 TLSv1.3;
+#    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+#    ssl_prefer_server_ciphers off;
+#
+#    # HSTS
+#    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+#
+#    # Include common configuration
+#    include /etc/nginx/snippets/common-locations.conf;
+#}

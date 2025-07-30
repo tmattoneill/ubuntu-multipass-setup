@@ -6,6 +6,7 @@
 # Version: 1.0.0
 
 set -euo pipefail
+trap 'echo "Error on line $LINENO"' ERR
 IFS=$'\n\t'
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,6 +75,87 @@ EXAMPLES:
     ${SCRIPT_NAME} --mode dev-only          # Install only development tools
 
 EOF
+}
+
+# Show banner
+show_banner() {
+    cat << "EOF"
+╔═══════════════════════════════════════════════════════════════╗
+║                Ubuntu Server Setup Script                    ║
+║                        Version 1.0.0                         ║
+║                                                               ║
+║   Comprehensive Ubuntu 20.04+ server setup with security,   ║
+║   development tools, and web server configuration            ║
+║                                                               ║
+║   https://github.com/tmattoneill/ubuntu-multipass-setup      ║
+╚═══════════════════════════════════════════════════════════════╝
+EOF
+    echo ""
+}
+
+# Security and environment checks
+security_check() {
+    log_info "Performing security and environment checks..."
+    
+    # Check if running as root (should be run with sudo, not as root directly)
+    if [[ $EUID -eq 0 ]] && [[ "${FORCE_ROOT:-}" != "true" ]] && [[ -z "${SUDO_USER:-}" ]]; then
+        log_error "Do not run this script directly as root!"
+        log_error "Use sudo instead: sudo ./setup.sh"
+        log_info "To override this check: FORCE_ROOT=true ./setup.sh"
+        exit 1
+    fi
+    
+    # Check if in container/VM environment
+    if command -v systemd-detect-virt >/dev/null 2>&1; then
+        local virt_type
+        virt_type=$(systemd-detect-virt 2>/dev/null || echo "none")
+        if [[ "$virt_type" != "none" ]]; then
+            log_info "Running in virtualized environment: $virt_type"
+            
+            # Special handling for containers
+            if [[ "$virt_type" == "docker" ]] || [[ "$virt_type" == "lxc" ]] || [[ "$virt_type" == "systemd-nspawn" ]]; then
+                log_warning "Detected container environment: $virt_type"
+                log_warning "Some features may not work properly in containers"
+                
+                if [[ "${CONTAINER_AWARE:-}" != "true" ]]; then
+                    log_info "Set CONTAINER_AWARE=true to skip this warning"
+                fi
+            fi
+        fi
+    fi
+    
+    # Check available disk space before starting
+    local available_space
+    available_space=$(df / | tail -1 | awk '{print $4}')
+    local available_gb=$((available_space / 1024 / 1024))
+    
+    if [[ $available_gb -lt $MIN_DISK_SPACE ]]; then
+        log_warning "Available disk space (${available_gb}GB) is less than recommended (${MIN_DISK_SPACE}GB)"
+        if [[ "${ASSUME_YES:-}" != "true" ]]; then
+            if ! prompt_user "Continue with limited disk space?"; then
+                log_info "Installation cancelled due to insufficient disk space"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # Check for conflicting services
+    local conflicting_services=("apache2" "lighttpd")
+    for service in "${conflicting_services[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log_warning "Conflicting service '$service' is running"
+            log_warning "This may cause issues with Nginx installation"
+        fi
+    done
+    
+    # Check network connectivity
+    log_info "Testing network connectivity..."
+    if ! ping -c 1 -W 5 8.8.8.8 >/dev/null 2>&1; then
+        log_warning "Network connectivity test failed"
+        log_warning "Installation may fail if internet access is required"
+    fi
+    
+    log_success "Security and environment checks completed"
 }
 
 # Parse command line arguments
@@ -253,12 +335,19 @@ get_modules_for_mode() {
 main() {
     local start_time=$(date +%s)
     
+    # Show banner first
+    show_banner
+    
     log_info "Starting Ubuntu Server Setup..."
     log_info "Timestamp: $(date)"
     log_info "Script: $SCRIPT_DIR/$SCRIPT_NAME"
     
     # Parse arguments and initialize
     parse_arguments "$@"
+    
+    # Perform security checks
+    security_check
+    
     initialize
     
     # System validation

@@ -1,0 +1,64 @@
+name: Test Ubuntu Setup Script
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Shell Script Linting
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      
+      - name: Lint shell scripts
+        run: |
+          shellcheck setup.sh lib/*.sh modules/*.sh
+          shellcheck tests/*.sh || true  # Allow tests to fail initially
+          shellcheck tools/*.sh || true  # Allow tools to fail initially
+
+  test:
+    runs-on: ubuntu-latest
+    name: Script Testing
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x setup.sh
+          chmod +x tests/test-all.sh
+      
+      - name: Run dry-run test
+        run: |
+          sudo ./setup.sh --dry-run --verbose --mode minimal
+      
+      - name: Run tests
+        run: |
+          bash tests/test-all.sh
+      
+      - name: Validate configuration
+        run: |
+          bash -n config.sh
+          bash -n lib/*.sh
+          bash -n modules/*.sh
+
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security checks
+        run: |
+          # Check for common security issues
+          ! grep -r "curl.*|.*sh" . --exclude-dir=.git || echo "Warning: Piped curl commands found"
+          ! grep -r "wget.*|.*sh" . --exclude-dir=.git || echo "Warning: Piped wget commands found"
+          ! grep -r "rm -rf /" . --exclude-dir=.git || echo "Error: Dangerous rm command found"

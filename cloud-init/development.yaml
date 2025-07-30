@@ -1,0 +1,219 @@
+#cloud-config
+
+# Development Environment Cloud-Init Configuration
+# Optimized for development work with additional tools and configurations
+
+package_update: true
+package_upgrade: true
+
+# Install additional development packages
+packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - nano
+  - htop
+  - tree
+  - jq
+  - unzip
+  - build-essential
+  - software-properties-common
+
+# Create development user
+users:
+  - name: developer
+    groups: [adm, sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC... # Add your SSH public key here
+
+# Write custom files
+write_files:
+  - path: /home/developer/.vimrc
+    content: |
+      " Basic Vim configuration for development
+      set number
+      set tabstop=4
+      set shiftwidth=4
+      set expandtab
+      set autoindent
+      set smartindent
+      set hlsearch
+      set incsearch
+      syntax on
+      colorscheme desert
+    owner: developer:developer
+    permissions: '0644'
+    
+  - path: /home/developer/.gitconfig
+    content: |
+      [user]
+          name = Developer
+          email = developer@example.com
+      [init]
+          defaultBranch = main
+      [core]
+          editor = vim
+      [alias]
+          st = status
+          co = checkout
+          br = branch
+          ci = commit
+          lg = log --oneline --graph --decorate
+    owner: developer:developer
+    permissions: '0644'
+    
+  - path: /home/developer/README.md
+    content: |
+      # Development Environment
+      
+      This is a development-focused Ubuntu instance created with Multipass.
+      
+      ## Pre-installed Tools
+      - Git, Vim, htop, tree, jq
+      - Build tools and development packages
+      - Ubuntu Setup Script (will be downloaded and executed)
+      
+      ## Next Steps
+      1. The setup script will run automatically
+      2. Additional development tools will be installed
+      3. Check /var/log/setup/ for installation logs
+      
+      ## Quick Commands
+      - `sudo /usr/local/bin/system-status.sh` - Check system status
+      - `sudo /usr/local/bin/verify-setup.sh` - Verify installation
+      - `htop` - System monitor
+      - `git status` - Check git status in any repo
+    owner: developer:developer
+    permissions: '0644'
+
+# Run commands to set up development environment
+runcmd:
+  # Update system first
+  - apt-get update
+  - apt-get upgrade -y
+  
+  # Download and run the setup script
+  - |
+    cd /home/developer
+    wget https://raw.githubusercontent.com/tmattoneill/ubuntu-multipass-setup/main/tools/quick-start.sh
+    chmod +x quick-start.sh
+    
+    # Run setup script in development mode
+    sudo -u developer ./quick-start.sh --mode dev-only --verbose || echo "Setup script failed, but continuing..."
+  
+  # Set up development directories
+  - mkdir -p /home/developer/projects
+  - mkdir -p /home/developer/scripts
+  - mkdir -p /home/developer/.ssh
+  - chown -R developer:developer /home/developer
+  
+  # Configure SSH for development
+  - |
+    cat >> /home/developer/.ssh/config << 'EOF'
+    Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+        LogLevel QUIET
+    EOF
+    chown developer:developer /home/developer/.ssh/config
+    chmod 600 /home/developer/.ssh/config
+  
+  # Add useful aliases
+  - |
+    cat >> /home/developer/.bashrc << 'EOF'
+    
+    # Development aliases
+    alias ll='ls -alF'
+    alias la='ls -A'
+    alias l='ls -CF'
+    alias ..='cd ..'
+    alias ...='cd ../..'
+    alias grep='grep --color=auto'
+    alias ports='netstat -tulanp'
+    alias myip='curl -s ifconfig.me'
+    
+    # Git aliases
+    alias gs='git status'
+    alias ga='git add'
+    alias gc='git commit'
+    alias gp='git push' 
+    alias gl='git log --oneline'
+    alias gd='git diff'
+    
+    # Development shortcuts
+    alias serve='python3 -m http.server'
+    alias jsonpp='python3 -m json.tool'
+    alias webdev='cd ~/projects && serve 8080'
+    
+    # System info
+    alias sysinfo='echo "=== System Info ===" && uname -a && echo && free -h && echo && df -h'
+    
+    # Welcome message
+    echo "🚀 Development environment ready!"
+    echo "📁 Projects directory: ~/projects"
+    echo "📋 System status: sudo /usr/local/bin/system-status.sh"
+    echo "🔧 Setup logs: tail -f /var/log/setup/setup-*.log"
+    EOF
+  
+  # Create a simple development script
+  - |
+    cat > /home/developer/scripts/dev-setup.sh << 'EOF'
+    #!/bin/bash
+    # Quick development environment setup script
+    
+    echo "Setting up development environment..."
+    
+    # Install Node.js if not already installed
+    if ! command -v node &> /dev/null; then
+        echo "Installing Node.js..."
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    fi
+    
+    # Install Python packages for development
+    pip3 install --user virtualenv requests flask fastapi
+    
+    # Create sample project structure
+    mkdir -p ~/projects/web ~/projects/api ~/projects/scripts
+    
+    echo "Development environment setup complete!"
+    echo "Node.js version: $(node --version 2>/dev/null || echo 'Not installed')"
+    echo "Python version: $(python3 --version)"
+    echo "Projects ready in ~/projects/"
+    EOF
+    chmod +x /home/developer/scripts/dev-setup.sh
+    chown developer:developer /home/developer/scripts/dev-setup.sh
+
+# Set timezone
+timezone: UTC
+
+# Set hostname
+hostname: ubuntu-dev
+
+# Final message
+final_message: |
+  =====================================
+  Ubuntu Development Environment Ready!
+  =====================================
+  
+  Instance: $INSTANCE
+  Connect: multipass shell $INSTANCE
+  
+  Development Features:
+  - User: developer (passwordless sudo)
+  - Pre-configured: Git, Vim, development tools
+  - Setup script executed in dev-only mode
+  - Ready for: Node.js, Python, web development
+  
+  Quick Start:
+  1. multipass shell $INSTANCE
+  2. cd ~/projects && git clone <your-repo>
+  3. Run: ~/scripts/dev-setup.sh (for additional tools)
+  
+  System Status: sudo /usr/local/bin/system-status.sh
+  Setup Logs: tail -f /var/log/setup/setup-*.log
+  
+  Happy coding! 🚀
