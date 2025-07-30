@@ -854,7 +854,11 @@ add_user_to_group() {
     local username="$1"
     local groupname="$2"
     
-    validate_username "$username" || return $?
+    # Skip validation for existing system users - we're not creating them
+    if [[ -z "$username" ]]; then
+        log_error "Username cannot be empty"
+        return $E_MISUSE
+    fi
     
     if ! user_exists "$username"; then
         log_error "User does not exist: $username"
