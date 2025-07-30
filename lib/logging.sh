@@ -148,6 +148,11 @@ log_warn() {
     log_message "WARN" "$1" "$YELLOW"
 }
 
+# Alias for compatibility
+log_warning() {
+    log_warn "$1"
+}
+
 log_error() {
     log_message "ERROR" "$1" "$RED"
 }
