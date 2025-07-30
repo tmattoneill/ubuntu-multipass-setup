@@ -291,16 +291,11 @@ create_ssl_config() {
     log_debug "Creating SSL configuration"
     
     cat > "$ssl_conf" << EOF
-# SSL configuration
+# SSL configuration (additional settings not in main nginx.conf)
+# Note: ssl_protocols, ssl_ciphers, ssl_prefer_server_ciphers already set in nginx.conf
+# Note: ssl_session_cache and ssl_session_timeout already set in nginx.conf
 
-# SSL protocols and ciphers
-ssl_protocols $SSL_PROTOCOLS;
-ssl_prefer_server_ciphers on;
-ssl_ciphers '$SSL_CIPHERS';
-
-# SSL session settings
-ssl_session_cache $SSL_SESSION_CACHE;
-ssl_session_timeout $SSL_SESSION_TIMEOUT;
+# Additional SSL settings not in main config
 ssl_session_tickets off;
 
 # OCSP stapling
@@ -310,7 +305,7 @@ ssl_stapling_verify on;
 # DH parameters (generate with: openssl dhparam -out /etc/nginx/dhparam.pem 2048)
 # ssl_dhparam /etc/nginx/dhparam.pem;
 
-# HSTS header
+# HSTS header (additional security header)
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 EOF
     
