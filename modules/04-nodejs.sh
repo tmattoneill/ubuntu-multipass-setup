@@ -25,6 +25,8 @@ main() {
     configure_npm
     install_global_packages
     configure_pm2
+    setup_nvm_for_users
+    verify_nodejs_environment
     
     log_success "Node.js environment module completed successfully"
 }
@@ -104,9 +106,12 @@ if [ -s "\$NVM_DIR/bash_completion" ] && [ -n "\$BASH_VERSION" ]; then
     . "\$NVM_DIR/bash_completion" 2>/dev/null || true
 fi
 
-# Lazy load NVM for better shell startup performance
-if [ -s "\$NVM_DIR/nvm.sh" ] && [ ! "\$(type -w nvm 2>/dev/null)" = "nvm: function" ]; then
-  export PATH="\$NVM_DIR/versions/node/\$(cat \$NVM_DIR/alias/default 2>/dev/null || echo 'system')/bin:\$PATH"
+# Add node and npm to PATH if default version exists
+if [ -f "\$NVM_DIR/alias/default" ]; then
+    DEFAULT_NODE_VERSION=\$(cat "\$NVM_DIR/alias/default" 2>/dev/null)
+    if [ -n "\$DEFAULT_NODE_VERSION" ] && [ -d "\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION" ]; then
+        export PATH="\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION/bin:\$PATH"
+    fi
 fi
 EOF
     
@@ -118,7 +123,8 @@ EOF
 install_nodejs() {
     log_subsection "Installing Node.js"
     
-    # Source NVM
+    # Source NVM with explicit environment setup
+    export NVM_DIR="$NVM_DIR"
     if ! source_nvm; then
         log_error "Failed to source NVM"
         return 1
@@ -128,10 +134,14 @@ install_nodejs() {
     local node_version="$NODE_VERSION"
     log_info "Installing Node.js version: $node_version"
     
-    if nvm install "$node_version" > /dev/null 2>&1; then
+    # Install with detailed output for debugging
+    local install_output
+    if install_output=$(nvm install "$node_version" 2>&1); then
         log_success "Node.js installed: $node_version"
+        log_debug "Install output: $install_output"
     else
         log_error "Failed to install Node.js: $node_version"
+        log_error "Install error: $install_output"
         return 1
     fi
     
@@ -151,6 +161,9 @@ install_nodejs() {
         return 1
     fi
     
+    # Reload NVM to ensure PATH is updated
+    source_nvm
+    
     # Verify installation
     verify_nodejs_installation
 }
@@ -158,13 +171,29 @@ install_nodejs() {
 # Source NVM function
 source_nvm() {
     if [[ -f "$NVM_DIR/nvm.sh" ]]; then
+        # Ensure NVM_DIR is set
+        export NVM_DIR="$NVM_DIR"
+        
         # Source NVM with error suppression for readonly variable warnings
-        source "$NVM_DIR/nvm.sh" 2>/dev/null || {
-            # If sourcing failed, try without bash completion
-            export NVM_DIR="$NVM_DIR"
+        if source "$NVM_DIR/nvm.sh" 2>/dev/null; then
+            log_debug "NVM sourced successfully"
+        else
+            # If sourcing failed, try alternative method
+            log_debug "Primary NVM source failed, trying alternative"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
-        }
-        return 0
+        fi
+        
+        # Load bash completion if available
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" 2>/dev/null
+        
+        # Verify NVM is now available
+        if declare -f nvm > /dev/null 2>&1; then
+            log_debug "NVM function is available"
+            return 0
+        else
+            log_warn "NVM function not available after sourcing"
+            return 1
+        fi
     else
         log_error "NVM script not found: $NVM_DIR/nvm.sh"
         return 1
@@ -257,7 +286,11 @@ create_npm_cache_directories() {
 setup_npm_user_directories() {
     log_info "Setting up npm directories for users"
     
+    # Include ubuntu user if it exists
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         setup_npm_for_user "$username"
@@ -338,6 +371,9 @@ configure_pm2() {
     
     # Configure PM2 for users
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
     
     for username in "${users[@]}"; do
         configure_pm2_for_user "$username"
@@ -474,6 +510,7 @@ verify_nodejs_environment() {
     log_subsection "Verifying Node.js Environment"
     
     # Source NVM
+    export NVM_DIR="$NVM_DIR"
     if ! source_nvm; then
         log_error "Failed to source NVM for verification"
         return 1
@@ -509,10 +546,170 @@ verify_nodejs_environment() {
         log_warn "Missing essential global packages: [${missing_packages[*]}]"
     fi
     
+    # Test Node.js for each user
+    test_nodejs_for_users
+    
     # Create test application for verification
     create_test_application
     
     log_success "Node.js environment verification completed"
+}
+
+# Test Node.js for all users
+test_nodejs_for_users() {
+    log_info "Testing Node.js availability for users"
+    
+    local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
+    
+    for username in "${users[@]}"; do
+        test_nodejs_for_user "$username"
+    done
+}
+
+# Test Node.js for specific user
+test_nodejs_for_user() {
+    local username="$1"
+    
+    if ! user_exists "$username"; then
+        log_debug "User $username does not exist, skipping Node.js test"
+        return 0
+    fi
+    
+    log_info "Testing Node.js for user: $username"
+    
+    # Test Node.js availability for the user
+    local test_result
+    test_result=$(sudo -u "$username" bash -c '
+        # Try to load NVM and test node
+        export NVM_DIR="'$NVM_DIR'"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
+        
+        # If node is available via NVM
+        if command -v node > /dev/null 2>&1; then
+            echo "node-available:$(node --version)"
+        else
+            echo "node-not-available"
+        fi
+        
+        # If npm is available
+        if command -v npm > /dev/null 2>&1; then
+            echo "npm-available:$(npm --version)"
+        else
+            echo "npm-not-available"
+        fi
+    ' 2>/dev/null)
+    
+    if echo "$test_result" | grep -q "node-available"; then
+        local node_version
+        node_version=$(echo "$test_result" | grep "node-available" | cut -d: -f2)
+        log_success "Node.js available for user $username: $node_version"
+    else
+        log_warn "Node.js not available for user $username"
+    fi
+    
+    if echo "$test_result" | grep -q "npm-available"; then
+        local npm_version
+        npm_version=$(echo "$test_result" | grep "npm-available" | cut -d: -f2)
+        log_success "npm available for user $username: v$npm_version"
+    else
+        log_warn "npm not available for user $username"
+    fi
+}
+
+# Set up NVM for users
+setup_nvm_for_users() {
+    log_subsection "Setting up NVM for Users"
+    
+    # Include ubuntu user if it exists
+    local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu"; then
+        users+=("ubuntu")
+    fi
+    
+    for username in "${users[@]}"; do
+        setup_nvm_for_user "$username"
+    done
+}
+
+# Set up NVM for specific user
+setup_nvm_for_user() {
+    local username="$1"
+    
+    # Check if user exists
+    if ! user_exists "$username"; then
+        log_warn "User $username does not exist, skipping NVM setup"
+        return 0
+    fi
+    
+    local home_dir
+    home_dir=$(getent passwd "$username" | cut -d: -f6)
+    
+    log_info "Setting up NVM for user: $username"
+    
+    # Add NVM to user's shell configurations
+    local shell_files=(".bashrc" ".zshrc" ".profile")
+    
+    for shell_file in "${shell_files[@]}"; do
+        local full_path="${home_dir}/${shell_file}"
+        if [[ -f "$full_path" ]]; then
+            # Add NVM configuration if not already present
+            if ! grep -q "NVM_DIR" "$full_path"; then
+                cat >> "$full_path" << EOF
+
+# NVM (Node Version Manager) configuration
+export NVM_DIR="$NVM_DIR"
+[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# Add node and npm to PATH if default version exists
+if [ -f "\$NVM_DIR/alias/default" ]; then
+    DEFAULT_NODE_VERSION=\$(cat "\$NVM_DIR/alias/default")
+    export PATH="\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION/bin:\$PATH"
+fi
+EOF
+                chown "$username:$username" "$full_path"
+                log_debug "Added NVM configuration to: $shell_file for user $username"
+            else
+                log_debug "NVM configuration already present in: $shell_file for user $username"
+            fi
+        fi
+    done
+    
+    # Create a user-specific NVM initialization script
+    local nvm_init_script="${home_dir}/.nvm_init"
+    cat > "$nvm_init_script" << EOF
+#!/bin/bash
+# NVM initialization script for user: $username
+
+# Function to initialize NVM
+init_nvm() {
+    export NVM_DIR="$NVM_DIR"
+    [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
+    [ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"
+}
+
+# Function to use default node version
+use_default_node() {
+    if [ -f "\$NVM_DIR/alias/default" ]; then
+        DEFAULT_NODE_VERSION=\$(cat "\$NVM_DIR/alias/default")
+        if [ -d "\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION" ]; then
+            export PATH="\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION/bin:\$PATH"
+        fi
+    fi
+}
+
+# Initialize NVM and set up default node
+init_nvm
+use_default_node
+EOF
+    
+    chown "$username:$username" "$nvm_init_script"
+    chmod +x "$nvm_init_script"
+    
+    log_success "NVM configured for user: $username"
 }
 
 # Module cleanup on exit
