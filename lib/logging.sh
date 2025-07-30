@@ -12,26 +12,30 @@ if [[ -z "${LOGGING_INITIALIZED:-}" ]]; then
         source "${SCRIPT_DIR:-$(dirname "${BASH_SOURCE[0]}")/../config.sh}"
     fi
     
-    # Set default values if config not loaded
-    LOG_DIR="${LOG_DIR:-/var/log/setup}"
-    LOG_FILE="${LOG_FILE:-${LOG_DIR}/setup-$(date +%Y%m%d-%H%M%S).log}"
+    # Set default values if config not loaded (avoid overriding readonly vars)
+    if [[ -z "${LOG_DIR:-}" ]]; then
+        LOG_DIR="/var/log/setup"
+    fi
+    if [[ -z "${LOG_FILE:-}" ]]; then
+        LOG_FILE="${LOG_DIR}/setup-$(date +%Y%m%d-%H%M%S).log"
+    fi
     DEFAULT_LOG_LEVEL="${DEFAULT_LOG_LEVEL:-INFO}"
     
-    # Color codes (will be empty if SETUP_NO_COLOR is set)
-    RED="${RED:-\033[0;31m}"
-    GREEN="${GREEN:-\033[0;32m}"
-    YELLOW="${YELLOW:-\033[1;33m}"
-    BLUE="${BLUE:-\033[0;34m}"
-    PURPLE="${PURPLE:-\033[0;35m}"
-    CYAN="${CYAN:-\033[0;36m}"
-    WHITE="${WHITE:-\033[1;37m}"
-    NC="${NC:-\033[0m}"
+    # Color codes (will be empty if SETUP_NO_COLOR is set) - avoid overriding readonly vars
+    if [[ -z "${RED:-}" ]]; then RED='\033[0;31m'; fi
+    if [[ -z "${GREEN:-}" ]]; then GREEN='\033[0;32m'; fi
+    if [[ -z "${YELLOW:-}" ]]; then YELLOW='\033[1;33m'; fi
+    if [[ -z "${BLUE:-}" ]]; then BLUE='\033[0;34m'; fi
+    if [[ -z "${PURPLE:-}" ]]; then PURPLE='\033[0;35m'; fi
+    if [[ -z "${CYAN:-}" ]]; then CYAN='\033[0;36m'; fi
+    if [[ -z "${WHITE:-}" ]]; then WHITE='\033[1;37m'; fi
+    if [[ -z "${NC:-}" ]]; then NC='\033[0m'; fi
     
-    # Log levels
-    LOG_LEVEL_DEBUG="${LOG_LEVEL_DEBUG:-0}"
-    LOG_LEVEL_INFO="${LOG_LEVEL_INFO:-1}"
-    LOG_LEVEL_WARN="${LOG_LEVEL_WARN:-2}"
-    LOG_LEVEL_ERROR="${LOG_LEVEL_ERROR:-3}"
+    # Log levels - avoid overriding readonly vars
+    if [[ -z "${LOG_LEVEL_DEBUG:-}" ]]; then LOG_LEVEL_DEBUG=0; fi
+    if [[ -z "${LOG_LEVEL_INFO:-}" ]]; then LOG_LEVEL_INFO=1; fi
+    if [[ -z "${LOG_LEVEL_WARN:-}" ]]; then LOG_LEVEL_WARN=2; fi
+    if [[ -z "${LOG_LEVEL_ERROR:-}" ]]; then LOG_LEVEL_ERROR=3; fi
 fi
 
 # Convert log level name to number
@@ -65,8 +69,11 @@ init_logging() {
     if [[ ! -d "$LOG_DIR" ]]; then
         if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
             echo "Warning: Cannot create log directory $LOG_DIR" >&2
-            LOG_FILE="/tmp/setup-$(date +%Y%m%d-%H%M%S).log"
-            LOG_DIR="/tmp"
+            # Use temp directory for logging if we can't create the configured log dir
+            # Don't override readonly variables - just use temp location
+            if [[ -z "${LOG_FILE_OVERRIDE:-}" ]]; then
+                export LOG_FILE_OVERRIDE="/tmp/setup-$(date +%Y%m%d-%H%M%S).log"
+            fi
         fi
     fi
     
@@ -75,19 +82,22 @@ init_logging() {
         chmod 750 "$LOG_DIR" 2>/dev/null || true
     fi
     
-    # Initialize log file
-    if ! touch "$LOG_FILE" 2>/dev/null; then
-        LOG_FILE="/tmp/setup-$(date +%Y%m%d-%H%M%S).log"
-        touch "$LOG_FILE" 2>/dev/null || true
+    # Initialize log file (use override if regular log file can't be created)
+    local actual_log_file="${LOG_FILE_OVERRIDE:-$LOG_FILE}"
+    if ! touch "$actual_log_file" 2>/dev/null; then
+        # Final fallback to temp file
+        actual_log_file="/tmp/setup-$(date +%Y%m%d-%H%M%S).log"
+        export LOG_FILE_OVERRIDE="$actual_log_file"
+        touch "$actual_log_file" 2>/dev/null || true
     fi
     
     # Set proper permissions on log file
-    if [[ -f "$LOG_FILE" ]] && [[ -w "$LOG_FILE" ]]; then
-        chmod 640 "$LOG_FILE" 2>/dev/null || true
+    if [[ -f "$actual_log_file" ]] && [[ -w "$actual_log_file" ]]; then
+        chmod 640 "$actual_log_file" 2>/dev/null || true
     fi
     
     # Log initialization
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Logging initialized: $LOG_FILE" >> "$LOG_FILE" 2>/dev/null || true
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Logging initialized: $actual_log_file" >> "$actual_log_file" 2>/dev/null || true
 }
 
 # Core logging function
@@ -108,8 +118,9 @@ log_message() {
     local formatted_message="$timestamp [$level] $message"
     
     # Write to log file (always, regardless of color settings)
-    if [[ -n "$LOG_FILE" ]] && [[ -w "$LOG_FILE" ]]; then
-        echo "$formatted_message" >> "$LOG_FILE" 2>/dev/null || true
+    local actual_log_file="${LOG_FILE_OVERRIDE:-$LOG_FILE}"
+    if [[ -n "$actual_log_file" ]] && [[ -w "$actual_log_file" ]]; then
+        echo "$formatted_message" >> "$actual_log_file" 2>/dev/null || true
     fi
     
     # Write to console with color if not disabled

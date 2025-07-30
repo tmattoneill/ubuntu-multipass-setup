@@ -303,18 +303,23 @@ readonly MAX_RETRIES=3
 readonly RETRY_DELAY=5
 readonly BACKUP_ON_ERROR=true
 
-# Module dependencies
-declare -A MODULE_DEPENDENCIES=(
-    ["02-users"]="01-prerequisites"
-    ["03-shell"]="02-users"
-    ["04-nodejs"]="01-prerequisites 02-users"
-    ["05-python"]="01-prerequisites"
-    ["06-nginx"]="01-prerequisites 02-users"
-    ["07-security"]="01-prerequisites"
-    ["08-monitoring"]="01-prerequisites"
-    ["09-optimization"]="01-prerequisites"
-    ["10-validation"]="01-prerequisites"
-)
+# Module dependencies (bash 4+ required for associative arrays)
+if [[ ${BASH_VERSION%%.*} -ge 4 ]]; then
+    declare -A MODULE_DEPENDENCIES=(
+        ["02-users"]="01-prerequisites"
+        ["03-shell"]="02-users"
+        ["04-nodejs"]="01-prerequisites 02-users"
+        ["05-python"]="01-prerequisites"
+        ["06-nginx"]="01-prerequisites 02-users"
+        ["07-security"]="01-prerequisites"
+        ["08-monitoring"]="01-prerequisites"
+        ["09-optimization"]="01-prerequisites"
+        ["10-validation"]="01-prerequisites"
+    )
+else
+    # Fallback for older bash versions - dependencies not enforced
+    echo "Warning: Bash version ${BASH_VERSION} - module dependencies not available" >&2
+fi
 
 # Export commonly used variables
 export LOG_DIR LOG_FILE TEMP_DIR BACKUP_DIR
