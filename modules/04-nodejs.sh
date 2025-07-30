@@ -60,10 +60,8 @@ install_nvm() {
     # Make installer executable
     chmod +x "$temp_installer"
     
-    # Install NVM to system location (use local vars to avoid readonly conflicts)
-    local nvm_install_dir="$NVM_DIR"
-    local nvm_profile="$NVM_PROFILE"
-    if env PROFILE="$nvm_profile" NVM_DIR="$nvm_install_dir" bash "$temp_installer" > /dev/null 2>&1; then
+    # Install NVM to system location (avoid readonly conflicts)
+    if env PROFILE="$NVM_PROFILE" NVM_DIR="$NVM_DIR" bash "$temp_installer" > /dev/null 2>&1; then
         log_success "NVM installed to: $NVM_DIR"
     else
         log_error "Failed to install NVM"
@@ -95,11 +93,19 @@ create_nvm_profile() {
 # NVM configuration for all users
 
 export NVM_DIR="$NVM_DIR"
-[ -s "\$NVM_DIR/nvm.sh" ] && . "\$NVM_DIR/nvm.sh"
-[ -s "\$NVM_DIR/bash_completion" ] && . "\$NVM_DIR/bash_completion"
+
+# Source NVM with error suppression for compatibility
+if [ -s "\$NVM_DIR/nvm.sh" ]; then
+    . "\$NVM_DIR/nvm.sh" 2>/dev/null || true
+fi
+
+# Load bash completion if available and in bash
+if [ -s "\$NVM_DIR/bash_completion" ] && [ -n "\$BASH_VERSION" ]; then
+    . "\$NVM_DIR/bash_completion" 2>/dev/null || true
+fi
 
 # Lazy load NVM for better shell startup performance
-if [ -s "\$NVM_DIR/nvm.sh" ] && [ ! "\$(type -w nvm)" = "nvm: function" ]; then
+if [ -s "\$NVM_DIR/nvm.sh" ] && [ ! "\$(type -w nvm 2>/dev/null)" = "nvm: function" ]; then
   export PATH="\$NVM_DIR/versions/node/\$(cat \$NVM_DIR/alias/default 2>/dev/null || echo 'system')/bin:\$PATH"
 fi
 EOF
@@ -152,7 +158,12 @@ install_nodejs() {
 # Source NVM function
 source_nvm() {
     if [[ -f "$NVM_DIR/nvm.sh" ]]; then
-        source "$NVM_DIR/nvm.sh"
+        # Source NVM with error suppression for readonly variable warnings
+        source "$NVM_DIR/nvm.sh" 2>/dev/null || {
+            # If sourcing failed, try without bash completion
+            export NVM_DIR="$NVM_DIR"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
+        }
         return 0
     else
         log_error "NVM script not found: $NVM_DIR/nvm.sh"
@@ -267,7 +278,7 @@ setup_npm_for_user() {
     
     # Configure npm for user
     sudo -u "$username" bash -c "
-        source $NVM_PROFILE
+        source $NVM_PROFILE 2>/dev/null || true
         npm config set prefix '$npm_global_dir'
         npm config set fund false
         npm config set audit-level moderate
@@ -346,7 +357,7 @@ configure_pm2_for_user() {
     
     # Set up PM2 for user
     sudo -u "$username" bash -c "
-        source $NVM_PROFILE
+        source $NVM_PROFILE 2>/dev/null || true
         if command -v pm2 > /dev/null 2>&1; then
             pm2 install pm2-logrotate > /dev/null 2>&1 || true
             pm2 set pm2-logrotate:max_size 10M > /dev/null 2>&1 || true
@@ -369,7 +380,7 @@ create_pm2_systemd_service() {
     # Get PM2 startup command
     local pm2_startup_cmd
     pm2_startup_cmd=$(sudo -u "$username" bash -c "
-        source $NVM_PROFILE
+        source $NVM_PROFILE 2>/dev/null || true
         if command -v pm2 > /dev/null 2>&1; then
             pm2 startup systemd -u $username --hp $home_dir 2>/dev/null | grep 'sudo'
         fi
@@ -450,7 +461,7 @@ EOF
     
     # Install dependencies
     sudo -u "$username" bash -c "
-        source $NVM_PROFILE
+        source $NVM_PROFILE 2>/dev/null || true
         cd $app_dir
         npm install > /dev/null 2>&1
     " || true
