@@ -81,13 +81,13 @@ EOF
 show_banner() {
     cat << "EOF"
 ╔═══════════════════════════════════════════════════════════════╗
-║                Ubuntu Server Setup Script                    ║
-║                        Version 1.0.0                         ║
+║                Ubuntu Server Setup Script                     ║
+║                        Version 1.0.0                          ║
 ║                                                               ║
-║   Comprehensive Ubuntu 20.04+ server setup with security,   ║
-║   development tools, and web server configuration            ║
+║   Comprehensive Ubuntu 20.04+ server setup with security,     ║
+║   development tools, and web server configuration             ║
 ║                                                               ║
-║   https://github.com/tmattoneill/ubuntu-multipass-setup      ║
+║   https://github.com/tmattoneill/ubuntu-multipass-setup       ║
 ╚═══════════════════════════════════════════════════════════════╝
 EOF
     echo ""

@@ -148,6 +148,143 @@ backup_file() {
     fi
 }
 
+# Create restore point before module execution
+create_restore_point() {
+    local checkpoint_name="$1"
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local backup_dir="${BACKUP_DIR}/checkpoints/${checkpoint_name}"
+    local manifest_file="${backup_dir}/manifest.txt"
+    
+    log_info "Creating restore point: $checkpoint_name"
+    
+    # Create checkpoint directory
+    create_directory "$backup_dir"
+    
+    # Record system state
+    cat > "$manifest_file" << EOF
+Checkpoint: $checkpoint_name
+Timestamp: $timestamp
+Date: $(date)
+Module: $checkpoint_name
+EOF
+    
+    # Backup critical configuration files
+    local config_files=(
+        "/etc/passwd"
+        "/etc/group"
+        "/etc/sudoers"
+        "/etc/nginx/nginx.conf"
+        "/etc/systemd/system.conf"
+    )
+    
+    for file in "${config_files[@]}"; do
+        if [[ -f "$file" ]]; then
+            backup_file "$file" "$backup_dir"
+            echo "$file" >> "$manifest_file"
+        fi
+    done
+    
+    # Record installed packages
+    dpkg -l > "${backup_dir}/installed-packages.txt"
+    
+    # Record service states
+    systemctl list-unit-files --type=service --state=enabled > "${backup_dir}/enabled-services.txt"
+    
+    log_success "Restore point created: $backup_dir"
+    return 0
+}
+
+# Rollback module changes
+rollback_module() {
+    local module_name="$1"
+    local backup_dir="${BACKUP_DIR}/checkpoints/${module_name}"
+    
+    if [[ ! -d "$backup_dir" ]]; then
+        log_error "No restore point found for module: $module_name"
+        return 1
+    fi
+    
+    log_warning "Rolling back module: $module_name"
+    log_warning "This is a basic rollback - manual intervention may be required"
+    
+    # Restore configuration files
+    if [[ -f "${backup_dir}/manifest.txt" ]]; then
+        while IFS= read -r file; do
+            if [[ "$file" =~ ^/ ]] && [[ -f "${backup_dir}/$(basename "$file").*.bak" ]]; then
+                local backup=$(ls -t "${backup_dir}/$(basename "$file").*.bak" | head -1)
+                log_info "Restoring: $file"
+                restore_file "$backup" "$file"
+            fi
+        done < "${backup_dir}/manifest.txt"
+    fi
+    
+    log_warning "Rollback completed - please verify system state"
+    return 0
+}
+
+# Generate final installation report
+generate_final_report() {
+    local start_time="$1"
+    local end_time="$2"
+    local duration="$3"
+    shift 3
+    
+    local successful_modules=()
+    local failed_modules=()
+    local parsing_failed=false
+    
+    # Parse remaining arguments
+    for arg in "$@"; do
+        if [[ "$arg" == "${failed_modules[@]}" ]]; then
+            parsing_failed=true
+        elif [[ "$parsing_failed" == true ]]; then
+            failed_modules+=("$arg")
+        else
+            successful_modules+=("$arg")
+        fi
+    done
+    
+    log_separator "=" 60
+    log_info "INSTALLATION REPORT"
+    log_separator "=" 60
+    
+    log_info "Start Time: $(date -d @"$start_time" '+%Y-%m-%d %H:%M:%S')"
+    log_info "End Time: $(date -d @"$end_time" '+%Y-%m-%d %H:%M:%S')"
+    log_info "Duration: $(format_duration "$duration")"
+    log_info ""
+    
+    if [[ ${#successful_modules[@]} -gt 0 ]]; then
+        log_success "Successful Modules (${#successful_modules[@]}):"
+        for module in "${successful_modules[@]}"; do
+            log_info "  ✓ $module"
+        done
+    fi
+    
+    if [[ ${#failed_modules[@]} -gt 0 ]]; then
+        log_error "Failed Modules (${#failed_modules[@]}):"
+        for module in "${failed_modules[@]}"; do
+            log_info "  ✗ $module"
+        done
+    fi
+    
+    log_info ""
+    log_info "System Information:"
+    log_info "  OS: $(get_system_info 'os') $(get_system_info 'version')"
+    log_info "  Hostname: $(get_system_info 'hostname')"
+    log_info "  IP: $(get_system_info 'ip')"
+    log_info "  Memory: $(get_system_info 'memory')"
+    log_info "  Disk Available: $(get_system_info 'disk')"
+    
+    if reboot_required; then
+        log_warning "REBOOT REQUIRED: System requires reboot to complete installation"
+    fi
+    
+    log_info ""
+    log_info "Log file: $LOG_FILE"
+    
+    log_separator "=" 60
+}
+
 # Restore file from backup
 restore_file() {
     local backup_path="$1"
@@ -335,17 +472,20 @@ get_system_info() {
 }
 
 # Generate random password
+# Current fallback is predictable:
+date +%s | sha256sum | base64 | head -c "$length"
+
+# Replace with:
 generate_password() {
     local length="${1:-16}"
-    local charset="${2:-A-Za-z0-9@#%^&*}"
     
     if command_exists "openssl"; then
-        openssl rand -base64 32 | tr -d "=+/" | cut -c1-"$length"
+        openssl rand -base64 $((length * 2)) | tr -d "=+/\n" | head -c "$length"
     elif [[ -f /dev/urandom ]]; then
-        tr -dc "$charset" < /dev/urandom | head -c "$length"
+        tr -dc 'A-Za-z0-9!@#$%^&*()_+{}|:<>?-=[]\\;,./' < /dev/urandom | head -c "$length"
     else
-        # Fallback method
-        date +%s | sha256sum | base64 | head -c "$length"
+        log_error "No secure random source available"
+        return 1
     fi
 }
 
