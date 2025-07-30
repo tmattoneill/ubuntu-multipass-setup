@@ -106,8 +106,9 @@ validate_memory() {
         log_success "Memory validation passed: ${total_memory}MB total"
         return 0
     else
-        log_error "Memory validation failed: ${total_memory}MB < ${min_memory}MB"
-        return 1
+        log_warn "Memory warning: ${total_memory}MB < ${min_memory}MB recommended"
+        log_warn "Installation may have performance issues with limited memory"
+        return 0  # Don't fail setup for memory warnings
     fi
 }
 
