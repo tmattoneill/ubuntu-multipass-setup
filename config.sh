@@ -142,13 +142,17 @@ readonly GLOBAL_NPM_PACKAGES=(
     "ts-node"
 )
 
-# Global pip packages
+# Global pip packages (only essential tools, not application packages)
 readonly GLOBAL_PIP_PACKAGES=(
     "pip"
     "setuptools"
     "wheel"
     "virtualenv"
     "pipenv"
+)
+
+# Application packages (installed in virtual environments, not globally)
+readonly VENV_PIP_PACKAGES=(
     "requests"
     "gunicorn"
     "uvicorn"

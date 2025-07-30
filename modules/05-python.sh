@@ -229,6 +229,7 @@ install_python_packages() {
         log_success "All global Python packages installed successfully"
     else
         log_warn "Some global Python packages failed to install: [${failed_packages[*]}]"
+        # Don't fail the module for package installation issues
     fi
     
     # List installed packages
@@ -252,6 +253,13 @@ create_virtual_environments() {
 # Create virtual environments for user
 create_user_virtual_environments() {
     local username="$1"
+    
+    # Check if user exists
+    if ! user_exists "$username"; then
+        log_warn "User $username does not exist, skipping virtual environment creation"
+        return 0
+    fi
+    
     local home_dir
     home_dir=$(getent passwd "$username" | cut -d: -f6)
     local venv_dir="${home_dir}/.virtualenvs"
@@ -275,6 +283,17 @@ create_user_virtual_environments() {
         pip install --upgrade pip > /dev/null 2>&1
         pip install wheel setuptools > /dev/null 2>&1
     " || true
+    
+    # Install application packages in virtual environment (not globally!)
+    local venv_packages=("${VENV_PIP_PACKAGES[@]}")
+    log_info "Installing application packages in virtual environment for $username"
+    
+    for package in "${venv_packages[@]}"; do
+        sudo -u "$username" bash -c "
+            source $default_venv/bin/activate
+            pip install $package > /dev/null 2>&1
+        " && log_debug "Installed $package in venv for $username" || log_debug "Failed to install $package in venv for $username"
+    done
     
     log_success "Virtual environments created for user: $username"
 }
