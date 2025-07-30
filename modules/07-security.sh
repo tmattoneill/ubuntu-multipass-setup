@@ -156,7 +156,7 @@ setup_fail2ban() {
         log_info "Fail2ban status:"
         fail2ban-client status 2>/dev/null | while read -r line; do
             log_info "  $line"
-        done
+        done || true  # Don't fail module if status command has issues
     fi
 }
 
