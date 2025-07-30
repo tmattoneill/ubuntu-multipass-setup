@@ -301,8 +301,9 @@ ssl_session_tickets off;
 # DH parameters (generate with: openssl dhparam -out /etc/nginx/dhparam.pem 2048)
 # ssl_dhparam /etc/nginx/dhparam.pem;
 
-# HSTS header (additional security header)
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+# HSTS header (server-specific security header - not in main config)
+# This is appropriate for SSL-enabled server blocks only
+# add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 EOF
     
     chmod 644 "$ssl_conf"
@@ -516,10 +517,8 @@ server {
     
     server_name _;
     
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
+    # Security headers are set globally in nginx.conf
+    # Individual server blocks can override with more specific headers
     
     # Rate limiting
     limit_req zone=general burst=5 nodelay;
