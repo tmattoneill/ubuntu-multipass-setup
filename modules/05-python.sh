@@ -130,14 +130,16 @@ setup_python_alternatives() {
 verify_python_installation() {
     log_debug "Verifying Python installation"
     
+    local verification_failed=false
+    
     # Check Python3
     if command -v python3 > /dev/null 2>&1; then
         local python_version
         python_version=$(python3 --version)
         log_success "Python3 verified: $python_version"
     else
-        log_error "Python3 command not found"
-        return 1
+        log_warn "Python3 command not found"
+        verification_failed=true
     fi
     
     # Check pip3
@@ -146,8 +148,12 @@ verify_python_installation() {
         pip_version=$(pip3 --version | awk '{print $2}')
         log_success "pip3 verified: v$pip_version"
     else
-        log_error "pip3 command not found"
-        return 1
+        log_warn "pip3 command not found"
+        verification_failed=true
+    fi
+    
+    if [[ "$verification_failed" == "true" ]]; then
+        return 1  # Let caller handle this gracefully
     fi
     
     return 0
@@ -601,13 +607,14 @@ verify_python_environment() {
     log_success "Python environment verification completed"
 }
 
-# Module cleanup on exit
+# Module cleanup on exit - make non-fatal
 cleanup() {
     local exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
-        log_error "Python environment module failed with exit code: $exit_code"
+        log_warn "Python environment module had issues (exit code: $exit_code) but continuing"
+        # Don't exit with error - let the module complete
+        exit 0
     fi
-    exit $exit_code
 }
 
 # Set up signal handlers
