@@ -25,6 +25,7 @@ main() {
     create_directory_structure
     configure_security_settings
     create_default_sites
+    install_and_configure_certbot
     configure_log_rotation
     start_and_enable_nginx
     
@@ -817,6 +818,242 @@ verify_nginx_setup() {
     done
     
     log_success "Nginx setup verification completed"
+}
+
+# Install and configure Certbot for SSL certificates
+install_and_configure_certbot() {
+    log_subsection "Installing and Configuring Certbot"
+    
+    # Install certbot and nginx plugin
+    log_info "Installing Certbot and Nginx plugin"
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot-nginx > /dev/null 2>&1; then
+        log_success "Certbot installed successfully"
+    else
+        log_warn "Failed to install Certbot, SSL certificates will need manual setup"
+        return 0
+    fi
+    
+    # Create certbot configuration directory
+    create_directory "/etc/letsencrypt" "755" "root" "root"
+    
+    # Create certbot renewal configuration
+    create_certbot_renewal_config
+    
+    # Create SSL certificate management script
+    create_ssl_management_script
+    
+    # Configure automatic renewal
+    configure_certbot_renewal
+    
+    # Create example SSL server block
+    create_ssl_server_example
+    
+    log_success "Certbot SSL setup completed"
+    log_info "To obtain SSL certificates, run: sudo certbot --nginx -d yourdomain.com"
+}
+
+# Create certbot renewal configuration
+create_certbot_renewal_config() {
+    log_info "Creating Certbot renewal configuration"
+    
+    local renewal_conf="/etc/letsencrypt/renewal-hooks/deploy/nginx-reload.sh"
+    create_directory "$(dirname "$renewal_conf")" "755" "root" "root"
+    
+    cat > "$renewal_conf" << 'EOF'
+#!/bin/bash
+# Reload nginx after certificate renewal
+/usr/bin/systemctl reload nginx
+EOF
+    
+    chmod +x "$renewal_conf"
+    log_success "Certbot renewal hooks configured"
+}
+
+# Create SSL certificate management script
+create_ssl_management_script() {
+    log_info "Creating SSL management script"
+    
+    local ssl_script="/usr/local/bin/manage-ssl.sh"
+    
+    cat > "$ssl_script" << 'EOF'
+#!/bin/bash
+# SSL Certificate Management Script
+
+set -euo pipefail
+
+show_usage() {
+    echo "Usage: $0 {obtain|renew|status|list} [domain]"
+    echo ""
+    echo "Commands:"
+    echo "  obtain <domain>  - Obtain SSL certificate for domain"
+    echo "  renew           - Renew all certificates"
+    echo "  status          - Show certificate status"
+    echo "  list            - List all certificates"
+    echo ""
+    echo "Examples:"
+    echo "  $0 obtain example.com"
+    echo "  $0 obtain example.com,www.example.com"
+    echo "  $0 renew"
+    echo "  $0 status"
+}
+
+obtain_certificate() {
+    local domain="$1"
+    
+    if [[ -z "$domain" ]]; then
+        echo "Error: Domain required"
+        show_usage
+        exit 1
+    fi
+    
+    echo "Obtaining SSL certificate for: $domain"
+    
+    # Test nginx configuration first
+    if ! nginx -t; then
+        echo "Error: Nginx configuration test failed"
+        exit 1
+    fi
+    
+    # Obtain certificate
+    certbot --nginx -d "$domain" --non-interactive --agree-tos --email admin@"$domain" --redirect
+    
+    echo "SSL certificate obtained successfully for: $domain"
+}
+
+renew_certificates() {
+    echo "Renewing SSL certificates..."
+    certbot renew --quiet
+    echo "Certificate renewal completed"
+}
+
+show_status() {
+    echo "SSL Certificate Status:"
+    certbot certificates
+}
+
+list_certificates() {
+    echo "Installed SSL Certificates:"
+    certbot certificates --quiet | grep "Certificate Name:" | sed 's/.*Certificate Name: /- /'
+}
+
+# Main execution
+case "${1:-}" in
+    obtain)
+        obtain_certificate "${2:-}"
+        ;;
+    renew)
+        renew_certificates
+        ;;
+    status)
+        show_status
+        ;;
+    list)
+        list_certificates
+        ;;
+    *)
+        show_usage
+        exit 1
+        ;;
+esac
+EOF
+    
+    chmod +x "$ssl_script"
+    log_success "SSL management script created: $ssl_script"
+}
+
+# Configure automatic certificate renewal
+configure_certbot_renewal() {
+    log_info "Configuring automatic certificate renewal"
+    
+    # Test if certbot renewal works
+    if certbot renew --dry-run > /dev/null 2>&1; then
+        log_success "Certbot renewal test passed"
+    else
+        log_warn "Certbot renewal test failed, manual configuration may be needed"
+    fi
+    
+    # Add renewal cron job (certbot package usually includes this, but ensure it exists)
+    local cron_job="0 12 * * * /usr/bin/certbot renew --quiet --post-hook '/usr/bin/systemctl reload nginx'"
+    
+    if (crontab -l 2>/dev/null | grep -q "certbot renew") || echo "$cron_job" | crontab - 2>/dev/null; then
+        log_success "Certbot renewal cron job configured"
+    else
+        log_warn "Failed to configure automatic renewal cron job"
+        log_info "Manual renewal command: sudo certbot renew"
+    fi
+}
+
+# Create example SSL server block
+create_ssl_server_example() {
+    log_info "Creating SSL server block example"
+    
+    local ssl_example="/etc/nginx/sites-available/ssl-example.conf"
+    
+    cat > "$ssl_example" << 'EOF'
+# SSL-enabled server block example
+# Copy and modify this file for your domains
+# 
+# 1. Copy: cp /etc/nginx/sites-available/ssl-example.conf /etc/nginx/sites-available/yourdomain.com
+# 2. Edit: nano /etc/nginx/sites-available/yourdomain.com
+# 3. Enable: ln -s /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/
+# 4. Test: nginx -t
+# 5. Reload: systemctl reload nginx
+# 6. Get SSL: sudo manage-ssl.sh obtain yourdomain.com
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com www.example.com;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name example.com www.example.com;
+    
+    root /var/www/html;
+    index index.html index.htm index.php;
+    
+    # SSL Configuration (managed by Certbot)
+    # ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    # include /etc/letsencrypt/options-ssl-nginx.conf;
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Rate limiting
+    limit_req zone=general burst=10 nodelay;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    
+    # Security: deny access to hidden files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    
+    # Optional: PHP-FPM configuration
+    # location ~ \.php$ {
+    #     include snippets/fastcgi-php.conf;
+    #     fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    # }
+}
+EOF
+    
+    chmod 644 "$ssl_example"
+    log_success "SSL server block example created: $ssl_example"
 }
 
 # Module cleanup on exit
