@@ -310,16 +310,27 @@ execute_module() {
 get_modules_for_mode() {
     case "$INSTALL_MODE" in
         "full")
-            echo "${MODULES[@]}"
+            printf '%s\n' "${MODULES[@]}"
             ;;
         "nginx-only")
-            echo "01-prerequisites 02-users 06-nginx 07-security 10-validation"
+            echo "01-prerequisites"
+            echo "02-users"
+            echo "06-nginx"
+            echo "07-security"
+            echo "10-validation"
             ;;
         "dev-only")
-            echo "01-prerequisites 02-users 03-shell 04-nodejs 05-python 10-validation"
+            echo "01-prerequisites"
+            echo "02-users"
+            echo "03-shell"
+            echo "04-nodejs"
+            echo "05-python"
+            echo "10-validation"
             ;;
         "minimal")
-            echo "01-prerequisites 02-users 10-validation"
+            echo "01-prerequisites"
+            echo "02-users"
+            echo "10-validation"
             ;;
         *)
             log_error "Unknown installation mode: $INSTALL_MODE"
@@ -351,8 +362,10 @@ main() {
     validate_system
     
     # Get modules to execute based on mode
-    local modules_to_run
-    read -ra modules_to_run <<< "$(get_modules_for_mode)"
+    local modules_to_run=()
+    while IFS= read -r module; do
+        [[ -n "$module" ]] && modules_to_run+=("$module")
+    done < <(get_modules_for_mode)
     
     log_info "Will execute ${#modules_to_run[@]} modules for mode: $INSTALL_MODE"
     
