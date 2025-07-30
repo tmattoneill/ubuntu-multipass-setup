@@ -289,9 +289,9 @@ install_python_packages() {
 create_virtual_environments() {
     log_subsection "Creating Virtual Environments"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -352,9 +352,9 @@ create_user_virtual_environments() {
 configure_python_for_users() {
     log_subsection "Configuring Python for Users"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     

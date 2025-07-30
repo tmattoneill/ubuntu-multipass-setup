@@ -286,9 +286,9 @@ create_npm_cache_directories() {
 setup_npm_user_directories() {
     log_info "Setting up npm directories for users"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -371,7 +371,7 @@ configure_pm2() {
     
     # Configure PM2 for users
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -560,7 +560,7 @@ test_nodejs_for_users() {
     log_info "Testing Node.js availability for users"
     
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -623,9 +623,9 @@ test_nodejs_for_user() {
 setup_nvm_for_users() {
     log_subsection "Setting up NVM for Users"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     

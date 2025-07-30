@@ -68,15 +68,16 @@ create_application_users() {
 # Create application user
 create_app_user() {
     local username="$PRIMARY_USER"
-    local home_dir="$APP_HOME"
+    local home_dir="$PRIMARY_USER_HOME"
     
-    log_info "Creating application user: $username"
+    log_info "Creating primary application user: $username"
     
     if user_exists "$username"; then
         log_debug "User already exists: $username"
+        # Ensure the user has the right shell and groups even if they exist
     else
         # Create user with home directory
-        if useradd -m -d "$home_dir" -s /bin/bash -c "Application User" "$username"; then
+        if useradd -m -d "$home_dir" -s /bin/bash -c "Primary Application User" "$username"; then
             log_success "Created user: $username"
         else
             log_error "Failed to create user: $username"
@@ -89,12 +90,13 @@ create_app_user() {
     create_directory "${home_dir}/.ssh" "700" "$username" "$username"
     create_directory "${home_dir}/bin" "755" "$username" "$username"
     create_directory "${home_dir}/logs" "755" "$username" "$username"
+    create_directory "${home_dir}/projects" "755" "$username" "$username"
     
     # Add user to groups
     add_user_to_group "$username" "$WEBAPP_GROUP"
     add_user_to_group "$username" "$NODEJS_GROUP"
     
-    log_success "Application user configured: $username"
+    log_success "Primary application user configured: $username ($home_dir)"
 }
 
 # Create deployment user
@@ -562,8 +564,16 @@ setup_user_ssh_keys() {
     
     log_info "Setting up SSH public key for users"
     
-    # Users to set up SSH keys for
+    # Users to set up SSH keys for - include ubuntu and primary user (avoiding duplicates)
     local users=("ubuntu" "$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    # Remove duplicates in case PRIMARY_USER is ubuntu
+    local unique_users=()
+    for user in "${users[@]}"; do
+        if [[ ! " ${unique_users[*]} " =~ " ${user} " ]]; then
+            unique_users+=("$user")
+        fi
+    done
+    users=("${unique_users[@]}")
     
     for username in "${users[@]}"; do
         # Skip if user doesn't exist

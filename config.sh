@@ -31,14 +31,19 @@ readonly WEBAPP_GROUP="webapps"
 readonly NODEJS_GROUP="nodejs"
 
 # Runtime user configuration (fallback if not set by setup.sh)
-PRIMARY_USER="${PRIMARY_USER:-$DEFAULT_APP_USER}"
+# Default to 'ubuntu' for better compatibility, but can be overridden
+PRIMARY_USER="${PRIMARY_USER:-ubuntu}"
 export PRIMARY_USER
 
 # User directories
 readonly APP_HOME="/home/${DEFAULT_APP_USER}"
 readonly DEPLOY_HOME="/home/${DEFAULT_DEPLOY_USER}"
+PRIMARY_USER_HOME="/home/${PRIMARY_USER}"
 readonly WEBAPP_ROOT="/var/www"
 readonly APP_DATA_DIR="/var/lib/apps"
+
+# Export dynamic directories
+export PRIMARY_USER_HOME
 
 # Software versions
 readonly NODE_VERSION="lts"  # Latest LTS version

@@ -282,6 +282,31 @@ gather_user_information() {
     log_info "Please provide some information for personalized setup:"
     echo
     
+    # Primary user configuration
+    echo "=== Primary User Configuration ==="
+    echo "The setup will create and configure a primary user for your applications."
+    echo "This user will have:"
+    echo "  • Development tools (Node.js, Python, Git)"
+    echo "  • Zsh with Oh My Zsh"
+    echo "  • SSH key configuration"
+    echo "  • Project directories and environment setup"
+    echo "  • Access to deployment and system management tools"
+    echo
+    read -p "Enter primary username (default: ubuntu): " primary_user_input
+    PRIMARY_USER="${primary_user_input:-ubuntu}"
+    
+    # Validate username
+    if [[ ! "$PRIMARY_USER" =~ ^[a-z][-a-z0-9]*$ ]]; then
+        log_error "Invalid username. Must start with lowercase letter and contain only lowercase letters, numbers, and hyphens."
+        exit 1
+    fi
+    
+    log_info "Primary user set to: $PRIMARY_USER"
+    if [[ "$PRIMARY_USER" != "ubuntu" ]]; then
+        log_info "Note: This will create a new user '$PRIMARY_USER' in addition to the existing 'ubuntu' user"
+    fi
+    echo
+    
     # Git configuration
     echo "=== Git Configuration ==="
     read -p "Enter your full name for Git commits (default: $USER): " git_name
@@ -327,6 +352,7 @@ gather_user_information() {
     # Summary
     echo
     echo "=== Configuration Summary ==="
+    echo "Primary User: $PRIMARY_USER"
     echo "Git Name: $GIT_USER_NAME"
     echo "Git Email: $GIT_USER_EMAIL"
     echo "SSH Key: $(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f1,3 2>/dev/null || echo "Provided")"
@@ -341,7 +367,7 @@ gather_user_information() {
     fi
     
     # Export variables for modules to use
-    export GIT_USER_NAME GIT_USER_EMAIL USER_SSH_PUBLIC_KEY SERVER_HOSTNAME SERVER_TIMEZONE
+    export PRIMARY_USER GIT_USER_NAME GIT_USER_EMAIL USER_SSH_PUBLIC_KEY SERVER_HOSTNAME SERVER_TIMEZONE
     
     log_success "User information gathered successfully"
 }

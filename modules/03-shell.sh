@@ -68,9 +68,9 @@ install_zsh() {
 install_oh_my_zsh() {
     log_subsection "Installing Oh My Zsh"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -153,9 +153,9 @@ install_oh_my_zsh_for_user() {
 configure_zsh_for_users() {
     log_subsection "Configuring Zsh"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -420,9 +420,9 @@ install_autosuggestions_plugin() {
 set_default_shells() {
     log_subsection "Setting Default Shells"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
@@ -463,9 +463,9 @@ set_user_shell() {
 verify_shell_setup() {
     log_subsection "Verifying Shell Setup"
     
-    # Include ubuntu user if it exists
+    # Include ubuntu user and primary user (avoiding duplicates)
     local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
-    if user_exists "ubuntu"; then
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
         users+=("ubuntu")
     fi
     
