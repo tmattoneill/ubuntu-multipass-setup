@@ -30,6 +30,10 @@ readonly DEFAULT_DEPLOY_USER="deploy"
 readonly WEBAPP_GROUP="webapps"
 readonly NODEJS_GROUP="nodejs"
 
+# Runtime user configuration (fallback if not set by setup.sh)
+PRIMARY_USER="${PRIMARY_USER:-$DEFAULT_APP_USER}"
+export PRIMARY_USER
+
 # User directories
 readonly APP_HOME="/home/${DEFAULT_APP_USER}"
 readonly DEPLOY_HOME="/home/${DEFAULT_DEPLOY_USER}"

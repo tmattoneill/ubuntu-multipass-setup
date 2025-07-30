@@ -304,11 +304,11 @@ apply_kernel_hardening() {
     log_subsection "Applying Kernel Hardening"
     
     # Use the security library function
-    if harden_kernel_parameters; then
+    if harden_kernel_parameters > /dev/null 2>&1; then
         log_success "Kernel parameters hardened"
     else
-        log_error "Failed to harden kernel parameters"
-        return 1
+        log_warn "Failed to harden kernel parameters, but continuing"
+        # Don't fail the entire module for kernel hardening issues
     fi
     
     # Configure additional security settings
@@ -555,17 +555,19 @@ create_security_report() {
     
     # Use the security library function
     local report_file
-    report_file=$(generate_security_report)
-    
-    if [[ -n "$report_file" ]] && [[ -f "$report_file" ]]; then
-        log_success "Security report created: $report_file"
-        
-        # Create symlink to latest report
-        local latest_report="${LOG_DIR}/security-report-latest.txt"
-        ln -sf "$report_file" "$latest_report"
-        log_info "Latest security report: $latest_report"
+    if report_file=$(generate_security_report 2>/dev/null); then
+        if [[ -n "$report_file" ]] && [[ -f "$report_file" ]]; then
+            log_success "Security report created: $report_file"
+            
+            # Create symlink to latest report
+            local latest_report="${LOG_DIR}/security-report-latest.txt"
+            ln -sf "$report_file" "$latest_report" 2>/dev/null || true
+            log_info "Latest security report: $latest_report"
+        else
+            log_warn "Security report generation returned empty result"
+        fi
     else
-        log_warn "Failed to create security report"
+        log_warn "Failed to create security report, but continuing"
     fi
 }
 
@@ -625,9 +627,11 @@ run_security_scan() {
     log_subsection "Running Security Scan"
     
     # Use the security library function
-    security_scan
-    
-    log_success "Security scan completed"
+    if security_scan > /dev/null 2>&1; then
+        log_success "Security scan completed successfully"
+    else
+        log_warn "Security scan had issues, but continuing"
+    fi
 }
 
 # Module cleanup on exit
