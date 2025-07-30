@@ -544,7 +544,11 @@ EOF
     chmod +x "$monitor_script"
     
     # Add to crontab to run every hour
-    (crontab -l 2>/dev/null; echo "0 * * * * $monitor_script") | crontab -
+    if (crontab -l 2>/dev/null; echo "0 * * * * $monitor_script") | crontab - 2>/dev/null; then
+        log_success "Log monitoring cron job configured"
+    else
+        log_warn "Failed to configure cron job for log monitoring, but continuing"
+    fi
     
     log_success "Log monitoring configured"
 }
