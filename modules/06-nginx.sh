@@ -293,14 +293,10 @@ create_ssl_config() {
     cat > "$ssl_conf" << EOF
 # SSL configuration (additional settings not in main nginx.conf)
 # Note: ssl_protocols, ssl_ciphers, ssl_prefer_server_ciphers already set in nginx.conf
-# Note: ssl_session_cache and ssl_session_timeout already set in nginx.conf
+# Note: ssl_session_cache, ssl_session_timeout, ssl_stapling already set in nginx.conf
 
 # Additional SSL settings not in main config
 ssl_session_tickets off;
-
-# OCSP stapling
-ssl_stapling on;
-ssl_stapling_verify on;
 
 # DH parameters (generate with: openssl dhparam -out /etc/nginx/dhparam.pem 2048)
 # ssl_dhparam /etc/nginx/dhparam.pem;
