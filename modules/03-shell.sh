@@ -78,6 +78,13 @@ install_oh_my_zsh() {
 # Install Oh My Zsh for specific user
 install_oh_my_zsh_for_user() {
     local username="$1"
+    
+    # Check if user exists
+    if ! user_exists "$username"; then
+        log_warn "User $username does not exist, skipping Oh My Zsh installation"
+        return 0
+    fi
+    
     local home_dir
     home_dir=$(getent passwd "$username" | cut -d: -f6)
     local oh_my_zsh_dir="${home_dir}/.oh-my-zsh"
@@ -106,12 +113,24 @@ install_oh_my_zsh_for_user() {
     
     # Install Oh My Zsh as the user (non-interactive)
     log_debug "Running Oh My Zsh installer for user: $username"
-    if sudo -u "$username" sh -c "RUNZSH=no CHSH=no $installer" > /dev/null 2>&1; then
+    
+    # Set environment variables for non-interactive installation
+    local install_cmd="cd '$home_dir' && RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh '$installer'"
+    
+    if sudo -u "$username" bash -c "$install_cmd" > /dev/null 2>&1; then
         log_success "Oh My Zsh installed for user: $username"
     else
         log_error "Failed to install Oh My Zsh for user: $username"
-        rm -rf "$temp_dir"
-        return 1
+        log_debug "Trying alternative installation method..."
+        
+        # Alternative installation method - clone directly
+        if sudo -u "$username" bash -c "cd '$home_dir' && git clone https://github.com/ohmyzsh/ohmyzsh.git .oh-my-zsh" > /dev/null 2>&1; then
+            log_success "Oh My Zsh installed via git clone for user: $username"
+        else
+            log_warn "Oh My Zsh installation failed for user: $username, continuing anyway"
+            rm -rf "$temp_dir"
+            return 0  # Don't fail the entire module
+        fi
     fi
     
     # Clean up
@@ -140,6 +159,13 @@ configure_zsh_for_users() {
 # Configure Zsh for specific user
 configure_zsh_for_user() {
     local username="$1"
+    
+    # Check if user exists
+    if ! user_exists "$username"; then
+        log_warn "User $username does not exist, skipping Zsh configuration"
+        return 0
+    fi
+    
     local home_dir
     home_dir=$(getent passwd "$username" | cut -d: -f6)
     local zshrc="${home_dir}/.zshrc"
