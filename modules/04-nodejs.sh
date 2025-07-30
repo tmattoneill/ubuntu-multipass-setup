@@ -60,8 +60,10 @@ install_nvm() {
     # Make installer executable
     chmod +x "$temp_installer"
     
-    # Install NVM to system location
-    if PROFILE="$NVM_PROFILE" NVM_DIR="$NVM_DIR" bash "$temp_installer" > /dev/null 2>&1; then
+    # Install NVM to system location (use local vars to avoid readonly conflicts)
+    local nvm_install_dir="$NVM_DIR"
+    local nvm_profile="$NVM_PROFILE"
+    if env PROFILE="$nvm_profile" NVM_DIR="$nvm_install_dir" bash "$temp_installer" > /dev/null 2>&1; then
         log_success "NVM installed to: $NVM_DIR"
     else
         log_error "Failed to install NVM"
