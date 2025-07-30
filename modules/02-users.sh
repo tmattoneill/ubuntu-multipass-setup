@@ -25,6 +25,7 @@ main() {
     configure_user_environments
     set_up_sudo_access
     configure_user_security
+    setup_user_ssh_keys
     
     log_success "User management module completed successfully"
 }
@@ -544,6 +545,57 @@ verify_user_setup() {
         log_error "User verification failed for: [${failed_users[*]}]"
         return 1
     fi
+}
+
+# Set up SSH keys for users
+setup_user_ssh_keys() {
+    log_subsection "Setting up SSH Keys"
+    
+    # Skip if no SSH key provided
+    if [[ -z "${USER_SSH_PUBLIC_KEY:-}" ]]; then
+        log_info "No SSH public key provided, skipping SSH key setup"
+        return 0
+    fi
+    
+    log_info "Setting up SSH public key for users"
+    
+    # Users to set up SSH keys for
+    local users=("ubuntu" "$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    
+    for username in "${users[@]}"; do
+        # Skip if user doesn't exist
+        if ! user_exists "$username"; then
+            log_debug "User $username does not exist, skipping SSH key setup"
+            continue
+        fi
+        
+        local home_dir
+        home_dir=$(getent passwd "$username" | cut -d: -f6)
+        local ssh_dir="${home_dir}/.ssh"
+        local authorized_keys="${ssh_dir}/authorized_keys"
+        
+        log_info "Setting up SSH key for user: $username"
+        
+        # Create .ssh directory
+        create_directory "$ssh_dir" "700" "$username" "$username"
+        
+        # Add the public key to authorized_keys
+        echo "$USER_SSH_PUBLIC_KEY" >> "$authorized_keys"
+        
+        # Set proper permissions
+        chmod 600 "$authorized_keys"
+        chown "$username:$username" "$authorized_keys"
+        
+        # Remove duplicate keys
+        sort "$authorized_keys" | uniq > "${authorized_keys}.tmp"
+        mv "${authorized_keys}.tmp" "$authorized_keys"
+        chmod 600 "$authorized_keys"
+        chown "$username:$username" "$authorized_keys"
+        
+        log_success "SSH key configured for user: $username"
+    done
+    
+    log_success "SSH key setup completed"
 }
 
 # Module cleanup on exit

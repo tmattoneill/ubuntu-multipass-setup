@@ -269,6 +269,83 @@ validate_system() {
     log_success "System validation completed successfully"
 }
 
+# Gather user information for setup
+gather_user_information() {
+    log_section "User Information Setup"
+    
+    # Skip if running in non-interactive mode
+    if [[ "${ASSUME_YES:-false}" == "true" ]] || [[ ! -t 0 ]]; then
+        log_info "Non-interactive mode: using default values"
+        return 0
+    fi
+    
+    log_info "Please provide some information for personalized setup:"
+    echo
+    
+    # Git configuration
+    echo "=== Git Configuration ==="
+    read -p "Enter your full name for Git commits (default: $USER): " git_name
+    GIT_USER_NAME="${git_name:-$USER}"
+    
+    read -p "Enter your email for Git commits: " git_email
+    GIT_USER_EMAIL="${git_email}"
+    
+    # SSH Key setup
+    echo
+    echo "=== SSH Key Setup ==="
+    echo "For secure access, we can set up your SSH public key."
+    
+    # Check if user has a local SSH key
+    local ssh_key_path=""
+    if [[ -f "$HOME/.ssh/id_rsa.pub" ]]; then
+        echo "Found SSH public key at ~/.ssh/id_rsa.pub"
+        read -p "Use this key? (y/n): " use_existing_key
+        if [[ "$use_existing_key" =~ ^[Yy] ]]; then
+            ssh_key_path="$HOME/.ssh/id_rsa.pub"
+        fi
+    fi
+    
+    if [[ -z "$ssh_key_path" ]]; then
+        echo "Please paste your SSH public key (starts with ssh-rsa, ssh-ed25519, etc.):"
+        read -p "SSH Public Key: " ssh_public_key
+        USER_SSH_PUBLIC_KEY="$ssh_public_key"
+    else
+        USER_SSH_PUBLIC_KEY=$(cat "$ssh_key_path")
+        echo "Using SSH key: $(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3)"
+    fi
+    
+    # Domain/hostname setup
+    echo
+    echo "=== Server Configuration ==="
+    read -p "Enter a hostname for this server (default: $(hostname)): " server_hostname
+    SERVER_HOSTNAME="${server_hostname:-$(hostname)}"
+    
+    # Timezone
+    read -p "Enter timezone (default: UTC): " server_timezone
+    SERVER_TIMEZONE="${server_timezone:-UTC}"
+    
+    # Summary
+    echo
+    echo "=== Configuration Summary ==="
+    echo "Git Name: $GIT_USER_NAME"
+    echo "Git Email: $GIT_USER_EMAIL"
+    echo "SSH Key: $(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f1,3 2>/dev/null || echo "Provided")"
+    echo "Hostname: $SERVER_HOSTNAME"
+    echo "Timezone: $SERVER_TIMEZONE"
+    echo
+    
+    read -p "Continue with this configuration? (y/n): " confirm_setup
+    if [[ ! "$confirm_setup" =~ ^[Yy] ]]; then
+        log_info "Setup cancelled by user"
+        exit 0
+    fi
+    
+    # Export variables for modules to use
+    export GIT_USER_NAME GIT_USER_EMAIL USER_SSH_PUBLIC_KEY SERVER_HOSTNAME SERVER_TIMEZONE
+    
+    log_success "User information gathered successfully"
+}
+
 # Execute a module
 execute_module() {
     local module_name=$1
@@ -360,6 +437,9 @@ main() {
     
     # System validation
     validate_system
+    
+    # Gather user information for personalized setup
+    gather_user_information
     
     # Get modules to execute based on mode
     local modules_to_run=()

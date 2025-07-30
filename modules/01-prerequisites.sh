@@ -30,6 +30,7 @@ main() {
     install_essential_packages
     install_development_packages
     configure_package_manager
+    configure_git_global_settings
     cleanup_packages
     
     log_success "Prerequisites module completed successfully"
@@ -176,6 +177,42 @@ verify_prerequisites() {
     else
         log_error "Missing required commands: [${missing_commands[*]}]"
         return 1
+    fi
+}
+
+# Configure Git global settings
+configure_git_global_settings() {
+    log_subsection "Configuring Git Global Settings"
+    
+    # Skip if no git credentials provided
+    if [[ -z "${GIT_USER_NAME:-}" ]] || [[ -z "${GIT_USER_EMAIL:-}" ]]; then
+        log_info "No Git credentials provided, skipping Git configuration"
+        return 0
+    fi
+    
+    log_info "Configuring Git with user: $GIT_USER_NAME <$GIT_USER_EMAIL>"
+    
+    # Set global Git configuration
+    git config --global user.name "$GIT_USER_NAME"
+    git config --global user.email "$GIT_USER_EMAIL"
+    
+    # Set some useful Git defaults
+    git config --global init.defaultBranch main
+    git config --global pull.rebase false
+    git config --global core.autocrlf input
+    git config --global core.editor nano
+    
+    # Verify configuration
+    local configured_name
+    local configured_email
+    configured_name=$(git config --global user.name)
+    configured_email=$(git config --global user.email)
+    
+    if [[ "$configured_name" == "$GIT_USER_NAME" ]] && [[ "$configured_email" == "$GIT_USER_EMAIL" ]]; then
+        log_success "Git global configuration set successfully"
+        log_info "Git user: $configured_name <$configured_email>"
+    else
+        log_warn "Git configuration may not have been set correctly"
     fi
 }
 
