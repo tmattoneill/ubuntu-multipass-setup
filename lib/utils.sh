@@ -3,10 +3,16 @@
 # Secure Utility Functions for Ubuntu Server Setup Script
 # Production-ready helper functions with proper security and error handling
 
-# Global variables
-readonly SCRIPT_DIR="${SCRIPT_DIR:-$(dirname "${BASH_SOURCE[0]}")}"
-readonly TEMP_DIR="${TEMP_DIR:-/tmp/setup-$$}"
-readonly BACKUP_DIR="${BACKUP_DIR:-/var/backups/server-setup}"
+# Global variables - avoid readonly conflicts
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+    readonly SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+fi
+if [[ -z "${TEMP_DIR:-}" ]]; then
+    readonly TEMP_DIR="/tmp/setup-$$"
+fi
+if [[ -z "${BACKUP_DIR:-}" ]]; then
+    readonly BACKUP_DIR="/var/backups/server-setup"
+fi
 
 # Exit codes
 readonly E_SUCCESS=0
