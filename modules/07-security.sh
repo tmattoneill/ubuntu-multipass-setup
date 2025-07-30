@@ -216,13 +216,60 @@ harden_ssh_configuration() {
 configure_automatic_updates() {
     log_subsection "Configuring Automatic Security Updates"
     
-    # Use the security library function
-    if configure_automatic_updates; then
-        log_success "Automatic security updates configured"
-    else
-        log_error "Failed to configure automatic security updates"
-        return 1
+    # Use the security library function - call the library function directly
+    # Source the security library to access its functions
+    source "${SCRIPT_DIR}/lib/security.sh"
+    
+    # Install unattended-upgrades if not present
+    if ! package_installed "unattended-upgrades"; then
+        apt-get update > /dev/null 2>&1
+        apt-get install -y unattended-upgrades > /dev/null 2>&1
     fi
+    
+    # Configure unattended-upgrades
+    local config_file="/etc/apt/apt.conf.d/50unattended-upgrades"
+    local auto_config="/etc/apt/apt.conf.d/20auto-upgrades"
+    
+    # Backup existing config
+    backup_file "$config_file"
+    
+    # Configure which updates to install
+    cat > "$config_file" << 'EOF'
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+EOF
+
+    # Enable automatic updates
+    cat > "$auto_config" << 'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+
+    # Enable and start the service
+    if systemctl enable unattended-upgrades > /dev/null 2>&1; then
+        log_success "Unattended-upgrades service enabled"
+    else
+        log_warn "Failed to enable unattended-upgrades service"
+    fi
+    
+    if systemctl start unattended-upgrades > /dev/null 2>&1; then
+        log_success "Unattended-upgrades service started"
+    else
+        log_warn "Failed to start unattended-upgrades service"
+    fi
+    
+    log_success "Automatic security updates configured"
     
     # Configure update notifications
     configure_update_notifications
