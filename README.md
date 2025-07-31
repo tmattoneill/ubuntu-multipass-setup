@@ -1,505 +1,258 @@
-# Ubuntu Server Setup Script
+# Ubuntu Multipass Setup
 
-A comprehensive, modular setup script for configuring Ubuntu 20.04 LTS+ servers with development tools, web server, and security hardening.
+A comprehensive, production-ready Ubuntu server setup script designed for automating server configuration with development tools, web servers, and security hardening. Features interactive configuration, modular architecture, and robust error handling.
 
-## Features
+## 🚀 Quick Start
 
-- **Modular Architecture**: 10 specialized modules for different aspects of server setup
-- **Multiple Installation Modes**: Full, nginx-only, dev-only, and minimal configurations
-- **Security First**: Comprehensive security hardening and monitoring
-- **Performance Optimized**: System tuning and optimization
-- **Extensive Logging**: Detailed logging with multiple levels
-- **Error Handling**: Rollback capabilities and comprehensive error handling
-- **Validation Framework**: Pre and post-installation validation
-- **Maintenance Tools**: Built-in monitoring and maintenance scripts
-
-## Quick Start
-
+### One-Command Setup (Recommended)
 ```bash
-# Clone or download the setup script
-wget https://your-repo.com/setup.sh
-# or git clone https://your-repo.com/ubuntu-setup.git
+# Clone repository
+git clone https://github.com/tmattoneill/ubuntu-multipass-setup.git
+cd ubuntu-multipass-setup
 
-# Make executable
-chmod +x setup.sh
-
-# Run with default settings (full installation)
-sudo ./setup.sh
-
-# Run with specific options
-sudo ./setup.sh --verbose --user myapp --mode nginx-only
+# Create instance and deploy setup in one command
+make all NAME=my-server
 ```
 
-## Installation Modes
-
-### Full Installation (default)
+### Manual Setup
 ```bash
+# Create multipass instance
+multipass launch --name my-server --cpus 2 --memory 4G --disk 20G
+
+# Deploy setup
+multipass transfer . my-server:ubuntu-multipass-setup/
+multipass shell my-server
+cd ubuntu-multipass-setup
 sudo ./setup.sh
 ```
-Includes: System updates, users, shell, Node.js, Python, Nginx, security, monitoring, optimization
 
-### Nginx-Only Mode
+## ✨ Key Features
+
+### 🎯 **Interactive Configuration**
+- **Primary User Selection**: Choose your main user (ubuntu, app, myproj, etc.)
+- **Git Configuration**: Name, email, and SSH key setup
+- **Server Settings**: Hostname and timezone configuration
+- **Configuration Summary**: Review all settings before installation
+
+### 🏗️ **Modular Architecture**
+- **10 Specialized Modules**: Each module handles specific functionality
+- **Independent Operation**: Modules can fail without stopping the entire setup
+- **Continue on Failure**: Option to proceed when individual modules fail
+- **Comprehensive Logging**: Detailed logs with multiple output levels
+
+### 🔒 **Security Hardening**
+- **UFW Firewall**: Configured with sensible defaults
+- **Fail2ban**: Protection against brute force attacks
+- **SSH Hardening**: Secure SSH configuration without lockouts
+- **SSL/TLS**: Automated Let's Encrypt certificates with Certbot
+- **Security Headers**: Comprehensive Nginx security configuration
+
+### 💻 **Development Environment**
+- **Node.js via NVM**: Latest LTS with global package management
+- **Python 3.11**: Virtual environments and development tools
+- **Zsh + Oh My Zsh**: Feature-rich shell with plugins and themes
+- **Git Configuration**: Personalized Git setup with SSH keys
+- **Development Tools**: Essential packages and utilities
+
+### 🌐 **Web Server Stack**
+- **Nginx**: High-performance web server with optimization
+- **SSL Certificates**: Automated certificate management
+- **Security Configuration**: Headers, rate limiting, and hardening
+- **Performance Tuning**: Optimized for production workloads
+
+### 📊 **Monitoring & Validation**
+- **System Health Monitoring**: Automated health checks and alerts
+- **Performance Monitoring**: Resource usage tracking
+- **Comprehensive Validation**: Post-installation testing and verification
+- **Maintenance Tools**: Automated maintenance scripts
+
+## 🛠️ Installation Modes
+
+| Mode | Description | Modules Included |
+|------|-------------|------------------|
+| **full** (default) | Complete server setup | All 10 modules |
+| **nginx-only** | Web server focused | Prerequisites, Users, Nginx, Security, Validation |
+| **dev-only** | Development environment | Prerequisites, Users, Shell, Node.js, Python, Validation |
+| **minimal** | Basic system setup | Prerequisites, Users, Validation |
+
 ```bash
+# Specify installation mode
 sudo ./setup.sh --mode nginx-only
-```
-Includes: System updates, users, Nginx, security, validation
-
-### Development-Only Mode
-```bash
 sudo ./setup.sh --mode dev-only
-```
-Includes: System updates, users, shell, Node.js, Python, validation
-
-### Minimal Mode
-```bash
 sudo ./setup.sh --mode minimal
 ```
-Includes: System updates, users, validation only
 
-## Command Line Options
+## 📋 Module Overview
 
-| Option | Description | Example |
-|--------|-------------|---------|
-| `-v, --verbose` | Enable verbose output | `--verbose` |
-| `-n, --dry-run` | Show what would be done without executing | `--dry-run` |
-| `-s, --skip-updates` | Skip system package updates | `--skip-updates` |
-| `-u, --user USER` | Specify primary application user | `--user webapp` |
-| `-m, --mode MODE` | Installation mode (full, nginx-only, dev-only, minimal) | `--mode nginx-only` |
-| `-y, --yes` | Assume yes for all prompts (non-interactive) | `--yes` |
-| `-h, --help` | Show help message | `--help` |
+| Module | Name | Description |
+|--------|------|-------------|
+| **01** | Prerequisites | System updates, essential tools, repositories |
+| **02** | Users | User creation, SSH keys, group management |
+| **03** | Shell | Zsh, Oh My Zsh, shell configuration |
+| **04** | Node.js | NVM, Node.js LTS, npm, global packages |
+| **05** | Python | Python 3.11, pip, virtual environments |
+| **06** | Nginx | Web server, SSL, security headers |
+| **07** | Security | UFW, fail2ban, SSH hardening |
+| **08** | Monitoring | System monitoring, health checks |
+| **09** | Optimization | Performance tuning, system optimization |
+| **10** | Validation | Testing, verification, final report |
 
-## Environment Variables
+## 🎮 Makefile Commands
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SETUP_LOG_LEVEL` | Set logging level (DEBUG, INFO, WARN, ERROR) | INFO |
-| `SETUP_NO_COLOR` | Disable colored output | - |
-| `SETUP_ASSUME_YES` | Auto-confirm prompts | - |
+| Command | Description | Example |
+|---------|-------------|---------|
+| `make help` | Show all available commands | `make help` |
+| `make create NAME=x` | Create multipass instance | `make create NAME=test-server` |
+| `make deploy NAME=x` | Deploy setup to instance | `make deploy NAME=test-server` |
+| `make all NAME=x` | Create + deploy in one command | `make all NAME=test-server` |
+| `make clean NAME=x` | Delete multipass instance | `make clean NAME=test-server` |
+| `make lint` | Check scripts with shellcheck | `make lint` |
+| `make test` | Run tests (if available) | `make test` |
 
-## Architecture
+## 🔧 Configuration
 
-### Main Components
-
-```
-setup.sh                    # Main orchestrator script
-config.sh                   # Configuration variables
-lib/                        # Utility libraries
-├── logging.sh              # Logging framework
-├── utils.sh                # Common utilities
-├── validation.sh           # System validation
-└── security.sh             # Security utilities
-modules/                    # Installation modules
-├── 01-prerequisites.sh     # System updates & essential tools
-├── 02-users.sh             # User & group management
-├── 03-shell.sh             # Zsh & Oh My Zsh setup
-├── 04-nodejs.sh            # Node.js/NVM installation
-├── 05-python.sh            # Python environment
-├── 06-nginx.sh             # Nginx installation & config
-├── 07-security.sh          # Firewall, fail2ban, hardening
-├── 08-monitoring.sh        # System monitoring tools
-├── 09-optimization.sh      # Performance optimization
-└── 10-validation.sh        # Final validation & cleanup
-```
-
-### Module Details
-
-#### 01-prerequisites.sh
-- System package updates
-- Essential build tools
-- Development packages
-- Package manager configuration
-
-#### 02-users.sh
-- Application user creation (`app`, `deploy`)
-- Group management (`webapps`, `nodejs`)
-- User environment configuration
-- SSH key setup
-- Sudo access configuration
-
-#### 03-shell.sh
-- Zsh installation
-- Oh My Zsh setup
-- Custom themes and plugins
-- Shell environment optimization
-
-#### 04-nodejs.sh
-- NVM (Node Version Manager) installation
-- Node.js latest LTS
-- Global npm packages (PM2, yarn, etc.)
-- npm configuration optimization
-
-#### 05-python.sh
-- Python 3.x installation via deadsnakes PPA
-- pip and virtual environment setup
-- Global Python packages
-- Development environment configuration
-
-#### 06-nginx.sh
-- Nginx installation from official repository
-- Security-hardened configuration
-- SSL/TLS optimization
-- Performance tuning
-- Custom error pages
-
-#### 07-security.sh
-- UFW firewall configuration
-- Fail2ban intrusion prevention
-- SSH hardening
-- Automatic security updates
-- Kernel parameter hardening
-- Security scanning tools
-
-#### 08-monitoring.sh
-- System monitoring tools (htop, iotop, etc.)
-- Log monitoring and analysis
-- Health check scripts
-- Performance monitoring
-- Alert system
-
-#### 09-optimization.sh
-- Kernel parameter optimization
-- I/O scheduler optimization
-- Network performance tuning
-- systemd limits configuration
-- CPU governor settings
-
-#### 10-validation.sh
-- Comprehensive system validation
-- Service functionality testing
-- Security configuration verification
-- Performance settings validation
-- Report generation
-- Maintenance tool creation
-
-## Security Features
-
-### Firewall Configuration
-- UFW with restrictive default policies
-- SSH rate limiting
-- HTTP/HTTPS access
-- Custom rule support
-
-### SSH Hardening
-- Root login disabled
-- Password authentication disabled
-- Key-based authentication only
-- Connection limits and timeouts
-
-### Intrusion Prevention
-- Fail2ban with custom filters
-- Multiple jail configurations
-- Automatic IP banning
-- Log monitoring
-
-### System Hardening
-- Kernel parameter security
-- File permission hardening
-- Service minimization
-- Automatic security updates
-
-## Performance Optimizations
-
-### System Tuning
-- Optimized swappiness settings
-- Network buffer optimization
-- I/O scheduler optimization
-- CPU governor configuration
-
-### Web Server Optimization
-- Worker process optimization
-- Connection handling tuning
-- Gzip compression
-- Static file caching
-
-### Development Environment
-- Optimized Node.js settings
-- Python environment optimization
-- Shell performance improvements
-
-## Monitoring and Maintenance
-
-### Built-in Monitoring
-- System health checks (every 15 minutes)
-- Resource monitoring (every 30 minutes)
-- Service monitoring (every 10 minutes)
-- Disk space monitoring (every hour)
-
-### Log Management
-- Centralized logging configuration
-- Log rotation setup
-- Log analysis tools
-- Alert system integration
-
-### Maintenance Tools
-- System status script: `/usr/local/bin/system-status.sh`
-- Performance report: `/usr/local/bin/performance-report.sh`
-- Health check API: `/usr/local/bin/health-check-api.sh`
-- Setup verification: `/usr/local/bin/verify-setup.sh`
-
-## Configuration
-
-### Default Settings
-- **Primary User**: `app`
-- **Deploy User**: `deploy`
-- **Node.js Version**: LTS
-- **Python Version**: 3.11
-- **Web Root**: `/var/www`
-- **Log Directory**: `/var/log/setup`
-
-### Customization
-Modify `config.sh` to customize:
-- Software versions
-- Directory paths
-- User configurations
-- Security settings
-- Performance parameters
-
-## File Structure After Installation
+### Interactive Setup
+The script guides you through configuration:
 
 ```
-/var/www/                   # Web server document root
-├── html/                   # Default web content
-├── default/                # Default site content
-└── errors/                 # Custom error pages
+=== Primary User Configuration ===
+Enter primary username (default: ubuntu): myapp
 
-/home/app/                  # Application user home
-├── .ssh/                   # SSH configuration
-├── python-projects/        # Python development directory
-└── test-app/              # Node.js test application
+=== Git Configuration ===
+Enter your full name for Git commits: John Doe
+Enter your email for Git commits: john@example.com
 
-/home/deploy/               # Deployment user home
-├── .ssh/                  # SSH configuration
-└── scripts/               # Deployment scripts
+=== SSH Key Setup ===
+[Automatically detects and configures SSH keys]
 
-/var/log/setup/            # Setup and monitoring logs
-├── setup-YYYYMMDD-HHMMSS.log     # Installation log
-├── system-summary-latest.txt      # System summary
-├── security-report-latest.txt     # Security report
-└── performance-report-latest.txt  # Performance report
-
-/usr/local/bin/            # Custom scripts
-├── system-status.sh       # System status check
-├── performance-report.sh  # Performance report
-├── health-check-api.sh    # Health check script
-└── verify-setup.sh        # Setup verification
+=== Server Configuration ===
+Enter a hostname for this server (default: ubuntu): my-server
+Enter timezone (default: UTC): America/New_York
 ```
 
-## Usage Examples
+### Advanced Configuration
+Edit `config.sh` for advanced customization:
+- Software versions and repositories
+- User accounts and permissions  
+- Security policies and firewall rules
+- Performance and monitoring settings
+- Package selections and configurations
 
-### Basic Installation
+## 🚨 Important Notes
+
+### Shell Configuration Changes
+After setup completion, **exit and reconnect** to activate all changes:
+
 ```bash
-# Download and run
-sudo ./setup.sh
+# Exit current session
+exit
+
+# Reconnect to activate Zsh + Node.js environment
+multipass shell my-server
 ```
 
-### Custom User Installation
-```bash
-# Install with custom application user
-sudo ./setup.sh --user myapp --verbose
-```
+### Post-Installation
+- **Zsh with Oh My Zsh**: Feature-rich shell environment
+- **Node.js + npm**: Available via NVM (latest LTS)
+- **Python virtual environments**: Ready for development
+- **SSL certificates**: Managed via `/usr/local/bin/manage-ssl.sh`
+- **System monitoring**: Automated health checks and logging
 
-### Development Server Setup
-```bash
-# Install only development tools
-sudo ./setup.sh --mode dev-only --user developer
-```
-
-### Production Web Server
-```bash
-# Install web server with security hardening
-sudo ./setup.sh --mode nginx-only --yes
-```
-
-### Preview Changes
-```bash
-# See what would be installed without making changes
-sudo ./setup.sh --dry-run --verbose
-```
-
-## Post-Installation
-
-### Verification
-```bash
-# Verify installation
-sudo /usr/local/bin/verify-setup.sh
-
-# Check system status
-sudo /usr/local/bin/system-status.sh
-
-# Generate performance report
-sudo /usr/local/bin/performance-report.sh
-```
-
-### Next Steps
-1. **Configure Domain**: Point your domain to the server
-2. **SSL Certificates**: Install SSL certificates (Let's Encrypt recommended)
-3. **Deploy Applications**: Upload your applications to `/var/www/html`
-4. **Backup Setup**: Configure regular backups
-5. **Monitoring**: Set up external monitoring
-
-### Application Deployment
-
-#### Node.js Application
-```bash
-# Switch to app user
-sudo su - app
-
-# Navigate to application directory
-cd /var/www/html
-
-# Install dependencies
-npm install
-
-# Start with PM2
-pm2 start app.js --name myapp
-pm2 save
-```
-
-#### Python Application
-```bash
-# Switch to app user
-sudo su - app
-
-# Create virtual environment
-python3 -m venv ~/.virtualenvs/myapp
-
-# Activate virtual environment
-source ~/.virtualenvs/myapp/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start application
-gunicorn --bind 0.0.0.0:8000 app:app
-```
-
-## Troubleshooting
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-#### Service Won't Start
+**Node.js/npm not found:**
 ```bash
-# Check service status
-systemctl status nginx
-
-# Check logs
-journalctl -u nginx -n 50
-
-# Test configuration
-nginx -t
+# Source NVM configuration
+source ~/.zshrc
+# Or explicitly use NVM
+nvm use node
 ```
 
-#### High Resource Usage
+**SSL certificate issues:**
 ```bash
-# Check system resources
-htop
-
-# Check disk usage
-df -h
-du -sh /*
-
-# Check running processes
-ps aux --sort=-%cpu
+# Use SSL management script
+sudo /usr/local/bin/manage-ssl.sh obtain yourdomain.com
+sudo /usr/local/bin/manage-ssl.sh status
 ```
 
-#### Web Server Not Accessible
+**Check logs:**
 ```bash
-# Check if nginx is running
-systemctl status nginx
+# View setup logs
+sudo tail -f /var/log/setup/setup-*.log
 
-# Test locally
-curl http://localhost/
-
-# Check firewall
-ufw status
-
-# Check logs
-tail -f /var/log/nginx/error.log
+# Check specific service
+sudo systemctl status nginx
+sudo systemctl status fail2ban
 ```
-
-### Log Locations
-- **Setup Logs**: `/var/log/setup/`
-- **System Logs**: `/var/log/syslog`
-- **Web Server**: `/var/log/nginx/`
-- **Security**: `/var/log/auth.log`
-- **Application**: `/var/log/webapps/`
-
-### Getting Help
-1. Check the troubleshooting guide: `/var/log/setup/troubleshooting-guide.txt`
-2. Review setup logs: `/var/log/setup/setup-latest.log`
-3. Run verification script: `/usr/local/bin/verify-setup.sh`
-4. Check system status: `/usr/local/bin/system-status.sh`
-
-## Requirements
-
-### System Requirements
-- **Operating System**: Ubuntu 20.04 LTS or newer
-- **Architecture**: x86_64 or arm64
-- **Memory**: Minimum 1GB RAM (2GB+ recommended)
-- **Disk Space**: Minimum 10GB available
-- **Network**: Internet connection for package downloads
-
-### Permissions
-- Must be run as root (use `sudo`)
-- Requires write access to system directories
-- Needs internet access for package downloads
-
-## Safety Features
-
-### Rollback Capabilities
-- Automatic backup of configuration files
-- Restore points before major changes
-- Manual rollback procedures
-- Configuration validation
-
-### Error Handling
-- Comprehensive error checking
-- Graceful failure handling
-- Detailed error logging
-- Recovery procedures
 
 ### Validation
-- Pre-installation system checks
-- Post-installation validation
-- Service functionality testing
-- Configuration verification
+The setup includes comprehensive validation testing:
+- System configuration verification
+- Service status checks  
+- Development environment testing
+- Security configuration validation
+- SSL certificate verification
 
-## Contributing
+## 🏗️ Architecture
 
-### Development
+### Project Structure
+```
+ubuntu-multipass-setup/
+├── setup.sh              # Main orchestrator script
+├── config.sh             # Centralized configuration
+├── Makefile              # Automation commands
+│
+├── lib/                  # Shared library functions
+│   ├── logging.sh        # Logging framework
+│   ├── utils.sh          # Utility functions
+│   ├── validation.sh     # System validation
+│   └── security.sh       # Security utilities
+│
+├── modules/              # Installation modules (01-10)
+│   ├── 01-prerequisites.sh
+│   ├── 02-users.sh
+│   ├── 03-shell.sh
+│   ├── 04-nodejs.sh
+│   ├── 05-python.sh
+│   ├── 06-nginx.sh
+│   ├── 07-security.sh
+│   ├── 08-monitoring.sh
+│   ├── 09-optimization.sh
+│   └── 10-validation.sh
+│
+└── cloud-init/           # Cloud-init configurations
+    └── basic.yaml
+```
+
+### Design Principles
+- **Modularity**: Independent, reusable components
+- **Error Handling**: Graceful failure and recovery
+- **Security First**: Secure defaults and hardening
+- **User Experience**: Interactive and informative
+- **Production Ready**: Tested and reliable configurations
+
+## 🤝 Contributing
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+4. Run `make lint` to check code quality
+5. Test with `make all NAME=test-instance`
+6. Submit a pull request
 
-### Testing
-- Test on clean Ubuntu installations
-- Verify all installation modes
-- Test rollback procedures
-- Validate security configurations
+## 📄 License
 
-## License
+MIT License - see [LICENSE](LICENSE) file for details.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 🙏 Acknowledgments
 
-## Support
-
-- **Documentation**: This README and inline comments
-- **Troubleshooting**: `/var/log/setup/troubleshooting-guide.txt`
-- **Issues**: Report issues via GitHub issues
-- **Security**: Report security issues privately
-
-## Version History
-
-### v1.0.0
-- Initial release
-- Complete modular architecture
-- All installation modes
-- Comprehensive security hardening
-- Performance optimization
-- Monitoring and maintenance tools
+- Built with ❤️ using modular shell scripting
+- Designed for Ubuntu 20.04+ compatibility
+- Optimized for Multipass development environments
+- Production-tested server configurations
 
 ---
 
-**Note**: This setup script makes significant changes to your system. Always test on non-production systems first and ensure you have proper backups.
+**Ready to deploy?** `make all NAME=your-server` 🚀
