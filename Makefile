@@ -1,13 +1,15 @@
-.PHONY: help test lint create deploy clean all
+.PHONY: help test lint create deploy deploy-auto clean all all-auto
 
 help:
 	@echo "Available commands:"
-	@echo "  make create NAME=myapp  - Create new multipass instance"
-	@echo "  make deploy NAME=myapp  - Deploy setup to existing instance"
-	@echo "  make all NAME=myapp     - Create instance and deploy setup"
-	@echo "  make test              - Run tests (if available)"
-	@echo "  make lint              - Check shell scripts with shellcheck"
-	@echo "  make clean NAME=myapp  - Delete multipass instance"
+	@echo "  make create NAME=myapp     - Create new multipass instance"
+	@echo "  make deploy NAME=myapp     - Deploy setup with interactive config"
+	@echo "  make deploy-auto NAME=myapp - Deploy setup with default settings (non-interactive)"
+	@echo "  make all NAME=myapp        - Create instance and deploy with interactive config"
+	@echo "  make all-auto NAME=myapp   - Create instance and deploy with defaults"
+	@echo "  make test                  - Run tests (if available)"
+	@echo "  make lint                  - Check shell scripts with shellcheck"
+	@echo "  make clean NAME=myapp      - Delete multipass instance"
 
 create:
 	@echo "Creating multipass instance: $(NAME)"
@@ -17,7 +19,13 @@ create:
 deploy:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME)"
 	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
-	@echo "Running setup script on $(NAME)..."
+	@echo "Running interactive setup script on $(NAME)..."
+	@multipass exec $(NAME) -- sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh
+
+deploy-auto:
+	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME) (non-interactive)"
+	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
+	@echo "Running automated setup script on $(NAME)..."
 	@multipass exec $(NAME) -- sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh --yes
 
 test:
@@ -37,7 +45,10 @@ lint:
 	fi
 
 all: create deploy
-	@echo "Instance $(NAME) created and setup deployed successfully!"
+	@echo "Instance $(NAME) created and interactive setup completed!"
+
+all-auto: create deploy-auto
+	@echo "Instance $(NAME) created and setup deployed automatically!"
 
 clean:
 	@echo "Deleting multipass instance: $(NAME)"
