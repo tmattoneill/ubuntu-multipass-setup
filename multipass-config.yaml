@@ -1,0 +1,72 @@
+# Multipass Configuration File
+# Define your preferred settings and profiles here
+
+# Default settings (used when no profile specified)
+default:
+  # Multipass instance settings
+  cpus: 2
+  memory: "4G"
+  disk: "20G"
+  
+  # Setup script preferences
+  primary_user: "ubuntu"
+  git_name: "Your Name"
+  git_email: "your.email@example.com"
+  hostname: "auto"  # "auto" uses instance name, or specify custom hostname
+  timezone: "UTC"
+  installation_mode: "full"  # full, nginx-only, dev-only, minimal
+  
+  # SSH key path (optional)
+  ssh_key_path: "~/.ssh/id_rsa.pub"
+
+# Development profile - more resources, dev-focused setup
+dev:
+  cpus: 4
+  memory: "6G" 
+  disk: "30G"
+  primary_user: "dev"
+  git_name: "Dev User"
+  git_email: "dev@mycompany.com"
+  hostname: "dev-server"
+  timezone: "America/New_York"
+  installation_mode: "dev-only"
+  ssh_key_path: "~/.ssh/id_rsa.pub"
+
+# Production profile - optimized for production workloads
+production:
+  cpus: 2
+  memory: "4G"
+  disk: "40G"
+  primary_user: "app"
+  git_name: "Production Deploy"
+  git_email: "deploy@mycompany.com"
+  hostname: "prod-server"
+  timezone: "UTC"
+  installation_mode: "nginx-only"
+  ssh_key_path: "~/.ssh/id_rsa.pub"
+
+# Personal profile - your personal preferences
+personal:
+  cpus: 3
+  memory: "5G"
+  disk: "25G"
+  primary_user: "steve"  # or whatever your preferred username is
+  git_name: "Steve Johnson"
+  git_email: "steve@example.com"
+  hostname: "my-server"
+  timezone: "America/Los_Angeles"
+  installation_mode: "full"
+  ssh_key_path: "~/.ssh/id_ed25519.pub"
+
+# Testing profile - minimal resources for quick testing
+testing:
+  cpus: 1
+  memory: "2G"
+  disk: "15G"
+  primary_user: "test"
+  git_name: "Test User"
+  git_email: "test@example.com"
+  hostname: "test-box"
+  timezone: "UTC"
+  installation_mode: "minimal"
+  ssh_key_path: "~/.ssh/id_rsa.pub"
