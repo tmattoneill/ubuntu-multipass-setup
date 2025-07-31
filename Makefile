@@ -16,7 +16,7 @@ create:
 
 deploy:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME)"
-	@multipass transfer . $(NAME):ubuntu-multipass-setup/
+	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
 	@echo "Running setup script on $(NAME)..."
 	@multipass exec $(NAME) -- sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh --yes
 
