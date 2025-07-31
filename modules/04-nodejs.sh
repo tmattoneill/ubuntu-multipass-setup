@@ -145,11 +145,21 @@ install_nodejs() {
         return 1
     fi
     
-    # Set as default
-    if nvm alias default "$node_version" > /dev/null 2>&1; then
-        log_success "Node.js set as default: $node_version"
+    # Get the actual installed version number (not the alias like "lts")
+    local installed_version
+    installed_version=$(nvm version "$node_version" 2>/dev/null || echo "")
+    
+    if [[ -n "$installed_version" ]]; then
+        log_info "Installed Node.js version: $installed_version"
+        # Set as default using the actual version number
+        if nvm alias default "$installed_version" > /dev/null 2>&1; then
+            log_success "Node.js set as default: $installed_version"
+        else
+            log_error "Failed to set Node.js as default: $installed_version"
+            return 1
+        fi
     else
-        log_error "Failed to set Node.js as default: $node_version"
+        log_error "Could not determine installed Node.js version"
         return 1
     fi
     
