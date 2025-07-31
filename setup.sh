@@ -522,10 +522,13 @@ main() {
     
     # Generate final report
     generate_final_report "$start_time" "$end_time" "$duration" \
-                         "${successful_modules[@]}" "${failed_modules[@]}"
+                         "${successful_modules[@]}" --failed "${failed_modules[@]}"
     
-    # Cleanup
+    # Clean up temporary files
     cleanup_temp_files
+    
+    # Clear the EXIT trap to avoid "Script terminated unexpectedly" message
+    trap - EXIT
     
     # Exit with appropriate code
     if [[ ${#failed_modules[@]} -eq 0 ]]; then
@@ -533,22 +536,80 @@ main() {
         exit 0
     else
         log_error "Setup completed with ${#failed_modules[@]} failed modules"
+        log_info "Check logs at: $LOG_FILE"
         exit 1
     fi
 }
 
-# Cleanup function for script termination
+# Generate final report
+generate_final_report() {
+    local start_time="$1"
+    local end_time="$2"
+    local duration="$3"
+    shift 3
+    
+    # Parse successful and failed modules from remaining arguments
+    local successful_modules=()
+    local failed_modules=()
+    local parsing_failed=false
+    
+    for arg in "$@"; do
+        if [[ "$arg" == "--failed" ]]; then
+            parsing_failed=true
+            continue
+        fi
+        
+        if [[ "$parsing_failed" == "true" ]]; then
+            failed_modules+=("$arg")
+        else
+            successful_modules+=("$arg")
+        fi
+    done
+    
+    # Display final report
+    echo
+    log_section "Setup Complete - Final Report"
+    
+    # Show timing information
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+    
+    if [[ $hours -gt 0 ]]; then
+        log_info "Total execution time: ${hours}h ${minutes}m ${seconds}s"
+    elif [[ $minutes -gt 0 ]]; then
+        log_info "Total execution time: ${minutes}m ${seconds}s"
+    else
+        log_info "Total execution time: ${seconds}s"
+    fi
+    
+    # Show successful modules
+    if [[ ${#successful_modules[@]} -gt 0 ]]; then
+        log_success "Successful modules (${#successful_modules[@]}):"
+        for module in "${successful_modules[@]}"; do
+            log_success "  ✓ $module"
+        done
+    fi
+    
+    # Show failed modules
+    if [[ ${#failed_modules[@]} -gt 0 ]]; then
+        log_error "Failed modules (${#failed_modules[@]}):"
+        for module in "${failed_modules[@]}"; do
+            log_error "  ✗ $module"
+        done
+    fi
+    
+    echo
+}
+
+# Cleanup function for script termination (only for unexpected exits)
 cleanup() {
     local exit_code=$?
-    log_info "Cleanup initiated (exit code: $exit_code)"
+    log_warn "Script interrupted or terminated unexpectedly (exit code: $exit_code)"
     
     cleanup_temp_files
     
-    if [[ $exit_code -ne 0 ]]; then
-        log_error "Script terminated unexpectedly"
-        log_info "Check logs at: $LOG_FILE"
-    fi
-    
+    log_info "Check logs at: $LOG_FILE"
     exit $exit_code
 }
 
