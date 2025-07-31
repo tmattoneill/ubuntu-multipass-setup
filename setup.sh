@@ -342,8 +342,8 @@ gather_user_information() {
     # Domain/hostname setup
     echo
     echo "=== Server Configuration ==="
-    read -p "Enter a hostname for this server (default: $(hostname)): " server_hostname
-    SERVER_HOSTNAME="${server_hostname:-$(hostname)}"
+    read -p "Enter a hostname for this server (default: ubuntu): " server_hostname
+    SERVER_HOSTNAME="${server_hostname:-ubuntu}"
     
     # Timezone
     read -p "Enter timezone (default: UTC): " server_timezone
