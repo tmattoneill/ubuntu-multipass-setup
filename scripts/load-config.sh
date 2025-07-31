@@ -57,6 +57,15 @@ if [[ "$SETUP_SSH_KEY_PATH" =~ ^~ ]]; then
     SETUP_SSH_KEY_PATH="${SETUP_SSH_KEY_PATH/#\~/$HOME}"
 fi
 
+# Load SSH public key content if file exists
+if [[ -f "$SETUP_SSH_KEY_PATH" ]]; then
+    export SETUP_SSH_PUBLIC_KEY=$(cat "$SETUP_SSH_KEY_PATH" 2>/dev/null || echo "")
+    SSH_KEY_STATUS="✓ Found"
+else
+    export SETUP_SSH_PUBLIC_KEY=""
+    SSH_KEY_STATUS="⚠ Not found"
+fi
+
 # Show loaded configuration
 echo "Loaded configuration profile: $PROFILE"
 echo "  CPUs: $MULTIPASS_CPUS"
@@ -68,4 +77,4 @@ echo "  Git Email: $SETUP_GIT_EMAIL"
 echo "  Hostname: $SETUP_HOSTNAME"
 echo "  Timezone: $SETUP_TIMEZONE"
 echo "  Mode: $SETUP_MODE"
-echo "  SSH Key: $SETUP_SSH_KEY_PATH"
+echo "  SSH Key: $SETUP_SSH_KEY_PATH ($SSH_KEY_STATUS)"

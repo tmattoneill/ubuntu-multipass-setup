@@ -1,6 +1,6 @@
 # Enhanced Makefile with configuration profiles support
 
-.PHONY: help test lint create deploy deploy-auto deploy-config clean all all-auto all-config profiles
+.PHONY: help test lint create deploy deploy-auto deploy-config clean all all-auto all-config profiles check-ssh
 
 # Load configuration (can be overridden with PROFILE=profilename)
 PROFILE ?= default
@@ -38,6 +38,7 @@ help:
 	@echo "Configuration:"
 	@echo "  make profiles                     - Show available profiles"
 	@echo "  make show-config PROFILE=dev     - Show profile configuration"
+	@echo "  make check-ssh PROFILE=dev       - Validate SSH key for profile"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make test                         - Run tests (if available)"
@@ -69,6 +70,14 @@ profiles:
 
 show-config:
 	@source scripts/load-config.sh $(PROFILE)
+	@echo ""
+	@echo "⚠️  SSH Key Validation:"
+	@if source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && [[ -n "$$SETUP_SSH_PUBLIC_KEY" ]]; then \
+		echo "✅ SSH key found and loaded"; \
+	else \
+		echo "❌ SSH key not found - you may not be able to access the instance!"; \
+		echo "   Update the ssh_key_path in multipass-config.yaml or use interactive setup"; \
+	fi
 
 create:
 	@echo "Creating multipass instance: $(NAME)"
@@ -99,15 +108,20 @@ deploy-auto:
 
 deploy-config:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME) with profile: $(PROFILE)"
+	@echo "Checking SSH key availability..."
+	@source scripts/load-config.sh $(PROFILE) >/dev/null
 	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
 	@echo "Running setup script with profile configuration..."
 	@multipass exec $(NAME) -- bash -c ' \
-		export PRIMARY_USER=$$(echo "$(PROFILE)" | cut -c1-10)_user 2>/dev/null || echo ubuntu; \
-		export GIT_USER_NAME="$$(source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_GIT_NAME || echo "User")"; \
-		export GIT_USER_EMAIL="$$(source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_GIT_EMAIL || echo "user@example.com")"; \
-		export SERVER_HOSTNAME="$$(source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_HOSTNAME || echo "$(NAME)")"; \
-		export SERVER_TIMEZONE="$$(source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_TIMEZONE || echo "UTC")"; \
-		sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh --yes --mode $$(source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_MODE || echo "full") \
+		source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1; \
+		export PRIMARY_USER="$$SETUP_PRIMARY_USER"; \
+		export GIT_USER_NAME="$$SETUP_GIT_NAME"; \
+		export GIT_USER_EMAIL="$$SETUP_GIT_EMAIL"; \
+		export USER_SSH_PUBLIC_KEY="$$SETUP_SSH_PUBLIC_KEY"; \
+		export SERVER_HOSTNAME="$$SETUP_HOSTNAME"; \
+		if [[ "$$SERVER_HOSTNAME" == "auto" ]]; then export SERVER_HOSTNAME="$(NAME)"; fi; \
+		export SERVER_TIMEZONE="$$SETUP_TIMEZONE"; \
+		sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh --yes --mode "$$SETUP_MODE" \
 	'
 
 test:
@@ -124,6 +138,25 @@ lint:
 		echo "Shellcheck completed successfully"; \
 	else \
 		echo "Warning: shellcheck not installed. Install with: brew install shellcheck"; \
+	fi
+
+check-ssh:
+	@echo "SSH Key Validation for Profile: $(PROFILE)"
+	@echo "==========================================="
+	@source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1
+	@if source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && [[ -n "$$SETUP_SSH_PUBLIC_KEY" ]]; then \
+		echo "✅ SSH key found and loaded successfully"; \
+		echo "   Key type: $$(source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_SSH_PUBLIC_KEY | cut -d' ' -f1)"; \
+		echo "   Key comment: $$(source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_SSH_PUBLIC_KEY | cut -d' ' -f3)"; \
+	else \
+		echo "❌ SSH key not found!"; \
+		echo "   Path checked: $$(source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo $$SETUP_SSH_KEY_PATH)"; \
+		echo "   ⚠️  WARNING: You may not be able to access the instance without SSH keys!"; \
+		echo ""; \
+		echo "Solutions:"; \
+		echo "1. Generate SSH key: ssh-keygen -t ed25519 -C 'your@email.com'"; \
+		echo "2. Update ssh_key_path in multipass-config.yaml"; \
+		echo "3. Use interactive setup: make deploy NAME=instance-name"; \
 	fi
 
 all: create deploy
