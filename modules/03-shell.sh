@@ -253,9 +253,9 @@ export LESS='-R'
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
-# Node.js configuration
-export NPM_CONFIG_PREFIX="\$HOME/.npm-global"
-export PATH="\$NPM_CONFIG_PREFIX/bin:\$PATH"
+# Node.js configuration (Note: NPM_CONFIG_PREFIX conflicts with NVM, handled by NVM setup)
+# export NPM_CONFIG_PREFIX="\$HOME/.npm-global"
+# export PATH="\$NPM_CONFIG_PREFIX/bin:\$PATH"
 
 # Python configuration
 export PYTHONDONTWRITEBYTECODE=1

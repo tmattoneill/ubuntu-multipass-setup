@@ -173,6 +173,9 @@ source_nvm() {
     if [[ -f "$NVM_DIR/nvm.sh" ]]; then
         # NVM_DIR is already set in config.sh as readonly, don't re-export
         
+        # Unset NPM_CONFIG_PREFIX to avoid NVM conflicts
+        unset NPM_CONFIG_PREFIX
+        
         # Source NVM with error suppression for readonly variable warnings
         if source "$NVM_DIR/nvm.sh" 2>/dev/null; then
             log_debug "NVM sourced successfully"
@@ -582,6 +585,7 @@ test_nodejs_for_user() {
     local test_result
     test_result=$(sudo -u "$username" bash -c '
         # Try to load NVM and test node
+        unset NPM_CONFIG_PREFIX  # Avoid NVM conflicts
         export NVM_DIR="'$NVM_DIR'"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
         
@@ -658,6 +662,8 @@ setup_nvm_for_user() {
                 cat >> "$full_path" << EOF
 
 # NVM (Node Version Manager) configuration
+# Unset NPM_CONFIG_PREFIX to avoid conflicts with NVM
+unset NPM_CONFIG_PREFIX
 export NVM_DIR="$NVM_DIR"
 [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"  # This loads nvm bash_completion
@@ -684,6 +690,8 @@ EOF
 
 # Function to initialize NVM
 init_nvm() {
+    # Unset NPM_CONFIG_PREFIX to avoid conflicts with NVM
+    unset NPM_CONFIG_PREFIX
     export NVM_DIR="$NVM_DIR"
     [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
     [ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"
