@@ -161,6 +161,21 @@ install_nodejs() {
         return 1
     fi
     
+    # Verify the installation immediately
+    if command -v node > /dev/null 2>&1; then
+        local installed_version=$(node --version 2>/dev/null || echo "unknown")
+        log_success "Node.js immediately available: $installed_version"
+    else
+        log_warn "Node.js not immediately available (may require new shell session)"
+    fi
+    
+    if command -v npm > /dev/null 2>&1; then
+        local npm_version=$(npm --version 2>/dev/null || echo "unknown")
+        log_success "npm immediately available: v$npm_version"
+    else
+        log_warn "npm not immediately available (may require new shell session)"
+    fi
+    
     # Reload NVM to ensure PATH is updated
     source_nvm
     
@@ -584,10 +599,33 @@ test_nodejs_for_user() {
     # Test Node.js availability for the user
     local test_result
     test_result=$(sudo -u "$username" bash -c '
+        # Debug NVM setup
+        echo "debug:NVM_DIR='$NVM_DIR'"
+        echo "debug:nvm.sh exists=$([ -s "'$NVM_DIR'/nvm.sh" ] && echo "yes" || echo "no")"
+        
         # Try to load NVM and test node
         unset NPM_CONFIG_PREFIX  # Avoid NVM conflicts
         export NVM_DIR="'$NVM_DIR'"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>/dev/null
+        
+        # Source NVM script
+        if [ -s "$NVM_DIR/nvm.sh" ]; then
+            \. "$NVM_DIR/nvm.sh" 2>/dev/null
+            echo "debug:nvm sourced"
+        else
+            echo "debug:nvm.sh not found"
+        fi
+        
+        # Check if nvm function is available
+        if declare -f nvm > /dev/null 2>&1; then
+            echo "debug:nvm function available"
+            # Try to use the default node version
+            nvm use default 2>/dev/null || nvm use node 2>/dev/null || true
+        else
+            echo "debug:nvm function not available"
+        fi
+        
+        # Check direct PATH access to node/npm
+        echo "debug:PATH contains $(echo $PATH | grep -o "[^:]*nvm[^:]*" || echo "no nvm paths")"
         
         # If node is available via NVM
         if command -v node > /dev/null 2>&1; then
@@ -602,7 +640,7 @@ test_nodejs_for_user() {
         else
             echo "npm-not-available"
         fi
-    ' 2>/dev/null)
+    ' 2>&1)
     
     if echo "$test_result" | grep -q "node-available"; then
         local node_version
