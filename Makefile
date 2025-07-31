@@ -1,6 +1,6 @@
 # Enhanced Makefile with configuration profiles support
 
-.PHONY: help test lint create deploy deploy-auto deploy-config clean all all-auto all-config profiles check-ssh
+.PHONY: help test lint create deploy deploy-auto deploy-config clean all all-auto all-config profiles check-ssh setup-profile interactive-config quick-setup
 
 # Load configuration (can be overridden with PROFILE=profilename)
 PROFILE ?= default
@@ -34,11 +34,14 @@ help:
 	@echo "  make create-config NAME=myapp PROFILE=dev     - Create with profile settings"
 	@echo "  make deploy-config NAME=myapp PROFILE=dev     - Deploy with profile + auto-config"
 	@echo "  make all-config NAME=myapp PROFILE=dev        - Create + deploy with profile"
+	@echo "  make quick-setup NAME=myapp PROFILE=personal  - Prompt for settings then deploy"
 	@echo ""
 	@echo "Configuration:"
 	@echo "  make profiles                     - Show available profiles"
 	@echo "  make show-config PROFILE=dev     - Show profile configuration"
 	@echo "  make check-ssh PROFILE=dev       - Validate SSH key for profile"
+	@echo "  make setup-profile PROFILE=dev   - Interactively configure profile settings"
+	@echo "  make interactive-config NAME=myapp PROFILE=dev - Update config then deploy"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make test                         - Run tests (if available)"
@@ -158,6 +161,23 @@ check-ssh:
 		echo "2. Update ssh_key_path in multipass-config.yaml"; \
 		echo "3. Use interactive setup: make deploy NAME=instance-name"; \
 	fi
+
+setup-profile:
+	@echo "Setting up profile: $(PROFILE)"
+	@echo "=============================="
+	@scripts/update-config.sh $(PROFILE)
+
+interactive-config: setup-profile all-config
+	@echo "Interactive setup completed for $(NAME) with $(PROFILE) profile!"
+
+quick-setup:
+	@echo "Quick Setup: $(NAME) with $(PROFILE) profile"
+	@echo "==========================================="
+	@echo "First, let's update your profile settings..."
+	@scripts/update-config.sh $(PROFILE)
+	@echo ""
+	@echo "Now creating and deploying instance..."
+	@$(MAKE) all-config NAME=$(NAME) PROFILE=$(PROFILE)
 
 all: create deploy
 	@echo "Instance $(NAME) created and interactive setup completed!"
