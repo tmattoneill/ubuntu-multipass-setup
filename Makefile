@@ -90,11 +90,11 @@ create:
 
 create-config:
 	@echo "Creating multipass instance: $(NAME) with profile: $(PROFILE)"
-	@source scripts/load-config.sh $(PROFILE)
+	@bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo "Resources: $$MULTIPASS_CPUS CPUs, $$MULTIPASS_MEMORY memory, $$MULTIPASS_DISK disk"'
 	@multipass launch --name $(NAME) \
-		--cpus $$(source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_CPUS) \
-		--memory $$(source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_MEMORY) \
-		--disk $$(source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_DISK)
+		--cpus $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_CPUS') \
+		--memory $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_MEMORY') \
+		--disk $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_DISK')
 	@echo "Instance $(NAME) created successfully with $(PROFILE) profile"
 
 deploy:

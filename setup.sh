@@ -318,25 +318,135 @@ gather_user_information() {
     # SSH Key setup
     echo
     echo "=== SSH Key Setup ==="
-    echo "For secure access, we can set up your SSH public key."
+    echo "For secure access, we need to set up your SSH public key."
+    echo "Note: If you're running this on a remote server, you'll want to paste"
+    echo "      your LOCAL machine's public key to access the multipass instance."
+    echo
     
-    # Check if user has a local SSH key
-    local ssh_key_path=""
-    if [[ -f "$HOME/.ssh/id_rsa.pub" ]]; then
-        echo "Found SSH public key at ~/.ssh/id_rsa.pub"
-        read -p "Use this key? (y/n): " use_existing_key
-        if [[ "$use_existing_key" =~ ^[Yy] ]]; then
-            ssh_key_path="$HOME/.ssh/id_rsa.pub"
+    # First, always offer to paste a key (most common use case)
+    read -p "Do you want to paste your SSH public key? (y/n): " paste_key
+    
+    if [[ "$paste_key" =~ ^[Yy] ]]; then
+        echo "Please paste your SSH public key (starts with ssh-rsa, ssh-ed25519, etc.):"
+        echo "Tip: On your local machine, run: cat ~/.ssh/id_rsa.pub (or id_ed25519.pub)"
+        read -p "SSH Public Key: " ssh_public_key
+        USER_SSH_PUBLIC_KEY="$ssh_public_key"
+        
+        # Validate the pasted key
+        if [[ -n "$USER_SSH_PUBLIC_KEY" && "$USER_SSH_PUBLIC_KEY" =~ ^(ssh-rsa|ssh-ed25519|ssh-dss|ecdsa-sha2-) ]]; then
+            local key_comment=$(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3 2>/dev/null || echo "")
+            echo "✅ SSH key accepted: ${key_comment:-[no comment]}"
+        else
+            echo "⚠️  Warning: The pasted key doesn't look like a valid SSH public key"
+            read -p "Continue anyway? (y/n): " continue_anyway
+            if [[ ! "$continue_anyway" =~ ^[Yy] ]]; then
+                USER_SSH_PUBLIC_KEY=""
+            fi
         fi
     fi
     
-    if [[ -z "$ssh_key_path" ]]; then
-        echo "Please paste your SSH public key (starts with ssh-rsa, ssh-ed25519, etc.):"
-        read -p "SSH Public Key: " ssh_public_key
-        USER_SSH_PUBLIC_KEY="$ssh_public_key"
-    else
-        USER_SSH_PUBLIC_KEY=$(cat "$ssh_key_path")
-        echo "Using SSH key: $(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3)"
+    # If no key was pasted, check for local keys as fallback
+    if [[ -z "${USER_SSH_PUBLIC_KEY:-}" ]]; then
+        echo
+        echo "Checking for SSH keys on this machine..."
+        
+        local ssh_key_path=""
+        local key_types=("id_ed25519" "id_rsa" "id_ecdsa")
+        local found_keys=()
+        
+        # Find all available keys
+        for key_type in "${key_types[@]}"; do
+            if [[ -f "$HOME/.ssh/${key_type}.pub" ]]; then
+                found_keys+=("${key_type}.pub")
+            fi
+        done
+        
+        if [[ ${#found_keys[@]} -gt 0 ]]; then
+            echo "Found SSH public keys on this machine:"
+            for i in "${!found_keys[@]}"; do
+                echo "  $((i+1)). ~/.ssh/${found_keys[$i]}"
+            done
+            echo "  $((${#found_keys[@]}+1)). Enter a different SSH public key"
+            echo "  $((${#found_keys[@]}+2)). Generate a new SSH key pair"
+            echo "  $((${#found_keys[@]}+3)). Skip SSH key setup (not recommended)"
+            
+            read -p "Choose option (1-$((${#found_keys[@]}+3))): " key_choice
+            
+            if [[ "$key_choice" -ge 1 && "$key_choice" -le ${#found_keys[@]} ]]; then
+                # Use selected local key
+                local selected_key="${found_keys[$((key_choice-1))]}"
+                ssh_key_path="$HOME/.ssh/$selected_key"
+                USER_SSH_PUBLIC_KEY=$(cat "$ssh_key_path")
+                echo "Using SSH key: ~/.ssh/$selected_key"
+                local key_comment=$(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3 2>/dev/null || echo "")
+                echo "Key comment: ${key_comment:-[no comment]}"
+            elif [[ "$key_choice" -eq $((${#found_keys[@]}+1)) ]]; then
+                # Enter different key
+                echo "Please paste your SSH public key:"
+                read -p "SSH Public Key: " ssh_public_key
+                USER_SSH_PUBLIC_KEY="$ssh_public_key"
+            elif [[ "$key_choice" -eq $((${#found_keys[@]}+2)) ]]; then
+                # Generate new key
+                echo "Generating new SSH key pair on this machine..."
+                mkdir -p "$HOME/.ssh"
+                chmod 700 "$HOME/.ssh"
+                
+                local new_key_path="$HOME/.ssh/id_ed25519"
+                if ssh-keygen -t ed25519 -f "$new_key_path" -C "${GIT_USER_EMAIL:-$USER@$(hostname)}" -N "" > /dev/null 2>&1; then
+                    echo "✅ SSH key pair generated successfully!"
+                    echo "   Private key: ${new_key_path}"
+                    echo "   Public key: ${new_key_path}.pub"
+                    USER_SSH_PUBLIC_KEY=$(cat "${new_key_path}.pub")
+                    echo "Generated key comment: $(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3)"
+                else
+                    echo "❌ Failed to generate SSH key"
+                    USER_SSH_PUBLIC_KEY=""
+                fi
+            else
+                # Skip SSH setup
+                echo "⚠️  WARNING: Skipping SSH key setup. You may not be able to access the server!"
+                echo "   You can still use 'multipass shell instance-name' to access the instance."
+                USER_SSH_PUBLIC_KEY=""
+            fi
+        else
+            echo "No SSH keys found on this machine."
+            echo "Options:"
+            echo "1. Enter your SSH public key manually"
+            echo "2. Generate a new SSH key pair on this machine"
+            echo "3. Skip SSH key setup (not recommended)"
+            
+            read -p "Choose option (1/2/3): " no_keys_option
+            
+            case "$no_keys_option" in
+                1)
+                    echo "Please paste your SSH public key:"
+                    read -p "SSH Public Key: " ssh_public_key
+                    USER_SSH_PUBLIC_KEY="$ssh_public_key"
+                    ;;
+                2)
+                    echo "Generating new SSH key pair..."
+                    mkdir -p "$HOME/.ssh"
+                    chmod 700 "$HOME/.ssh"
+                    
+                    local new_key_path="$HOME/.ssh/id_ed25519"
+                    if ssh-keygen -t ed25519 -f "$new_key_path" -C "${GIT_USER_EMAIL:-$USER@$(hostname)}" -N "" > /dev/null 2>&1; then
+                        echo "✅ SSH key pair generated successfully!"
+                        USER_SSH_PUBLIC_KEY=$(cat "${new_key_path}.pub")
+                    else
+                        echo "❌ Failed to generate SSH key"
+                        USER_SSH_PUBLIC_KEY=""
+                    fi
+                    ;;
+                3)
+                    echo "⚠️  WARNING: Skipping SSH key setup."
+                    USER_SSH_PUBLIC_KEY=""
+                    ;;
+                *)
+                    echo "Invalid option. Skipping SSH key setup."
+                    USER_SSH_PUBLIC_KEY=""
+                    ;;
+            esac
+        fi
     fi
     
     # Domain/hostname setup

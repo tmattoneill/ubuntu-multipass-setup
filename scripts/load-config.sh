@@ -62,8 +62,25 @@ if [[ -f "$SETUP_SSH_KEY_PATH" ]]; then
     export SETUP_SSH_PUBLIC_KEY=$(cat "$SETUP_SSH_KEY_PATH" 2>/dev/null || echo "")
     SSH_KEY_STATUS="✓ Found"
 else
-    export SETUP_SSH_PUBLIC_KEY=""
-    SSH_KEY_STATUS="⚠ Not found"
+    # Check for any SSH keys in ~/.ssh/
+    local found_key=""
+    local key_types=("id_ed25519" "id_rsa" "id_ecdsa")
+    
+    for key_type in "${key_types[@]}"; do
+        local key_path="${HOME}/.ssh/${key_type}.pub"
+        if [[ -f "$key_path" ]]; then
+            export SETUP_SSH_PUBLIC_KEY=$(cat "$key_path" 2>/dev/null || echo "")
+            export SETUP_SSH_KEY_PATH="$key_path"
+            SSH_KEY_STATUS="✓ Found alternative ($key_type)"
+            found_key="yes"
+            break
+        fi
+    done
+    
+    if [[ -z "$found_key" ]]; then
+        export SETUP_SSH_PUBLIC_KEY=""
+        SSH_KEY_STATUS="⚠ Not found"
+    fi
 fi
 
 # Show loaded configuration

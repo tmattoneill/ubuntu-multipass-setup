@@ -264,6 +264,24 @@ export PYTHONUNBUFFERED=1
 # Add user bin directories to PATH (including ubuntu user)
 export PATH="\$HOME/bin:\$HOME/.local/bin:/home/ubuntu/.local/bin:\$PATH"
 
+# NVM (Node Version Manager) configuration
+# Unset NPM_CONFIG_PREFIX to avoid conflicts with NVM
+unset NPM_CONFIG_PREFIX
+export NVM_DIR="/opt/nvm"
+[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# Add node and npm to PATH if default version exists
+if [ -f "\$NVM_DIR/alias/default" ]; then
+    DEFAULT_NODE_VERSION=\$(cat "\$NVM_DIR/alias/default" 2>/dev/null || echo "")
+    if [ -n "\$DEFAULT_NODE_VERSION" ] && [ -d "\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION" ]; then
+        export PATH="\$NVM_DIR/versions/node/\$DEFAULT_NODE_VERSION/bin:\$PATH"
+    fi
+fi
+
+# Python alias for convenience
+alias python='python3'
+
 # Custom aliases
 alias ll='ls -alF'
 alias la='ls -A'
