@@ -533,10 +533,21 @@ main() {
     # Exit with appropriate code
     if [[ ${#failed_modules[@]} -eq 0 ]]; then
         log_success "Setup completed successfully!"
+        echo
+        log_info "============================================================"
+        log_info "IMPORTANT: Shell configuration changes require a new session"
+        log_info "============================================================"
+        log_info "To activate all changes (Zsh, Node.js, Python environments):"
+        log_info "1. Exit this session: type 'exit'"
+        log_info "2. Reconnect: multipass shell <instance-name>"
+        log_info "3. You'll then have Zsh with Oh My Zsh and working Node.js/npm"
+        echo
         exit 0
     else
         log_error "Setup completed with ${#failed_modules[@]} failed modules"
         log_info "Check logs at: $LOG_FILE"
+        echo
+        log_info "Note: Shell changes require exit and reconnect to take effect"
         exit 1
     fi
 }

@@ -413,7 +413,9 @@ test_development_environments() {
     
     # Test Node.js environment
     if [[ -f "$NVM_DIR/nvm.sh" ]]; then
-        if source "$NVM_DIR/nvm.sh" && node --version > /dev/null 2>&1; then
+        # Unset NPM_CONFIG_PREFIX to avoid NVM conflicts
+        unset NPM_CONFIG_PREFIX
+        if source "$NVM_DIR/nvm.sh" && nvm use node > /dev/null 2>&1 && node --version > /dev/null 2>&1; then
             local node_version
             node_version=$(node --version)
             log_success "Node.js environment test passed: $node_version"
