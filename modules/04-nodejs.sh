@@ -124,7 +124,7 @@ install_nodejs() {
     log_subsection "Installing Node.js"
     
     # Source NVM with explicit environment setup
-    export NVM_DIR="$NVM_DIR"
+    # NVM_DIR is already exported from config.sh, avoid readonly conflict
     if ! source_nvm; then
         log_error "Failed to source NVM"
         return 1
@@ -171,8 +171,7 @@ install_nodejs() {
 # Source NVM function
 source_nvm() {
     if [[ -f "$NVM_DIR/nvm.sh" ]]; then
-        # Ensure NVM_DIR is set
-        export NVM_DIR="$NVM_DIR"
+        # NVM_DIR is already set in config.sh as readonly, don't re-export
         
         # Source NVM with error suppression for readonly variable warnings
         if source "$NVM_DIR/nvm.sh" 2>/dev/null; then
@@ -509,8 +508,7 @@ EOF
 verify_nodejs_environment() {
     log_subsection "Verifying Node.js Environment"
     
-    # Source NVM
-    export NVM_DIR="$NVM_DIR"
+    # Source NVM (NVM_DIR already exported from config.sh)
     if ! source_nvm; then
         log_error "Failed to source NVM for verification"
         return 1
