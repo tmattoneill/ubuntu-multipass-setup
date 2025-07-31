@@ -99,13 +99,23 @@ create-config:
 
 deploy:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME)"
-	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
+	@echo "Creating deployment archive (excluding .git)..."
+	@tar --exclude='.git' --exclude='*.tar.gz' -czf /tmp/ubuntu-multipass-setup.tar.gz .
+	@multipass transfer /tmp/ubuntu-multipass-setup.tar.gz $(NAME):/tmp/
+	@multipass exec $(NAME) -- bash -c 'cd /home/ubuntu && rm -rf ubuntu-multipass-setup && tar -xzf /tmp/ubuntu-multipass-setup.tar.gz && mkdir -p ubuntu-multipass-setup && mv * ubuntu-multipass-setup/ 2>/dev/null || true'
+	@multipass exec $(NAME) -- rm -f /tmp/ubuntu-multipass-setup.tar.gz
+	@rm -f /tmp/ubuntu-multipass-setup.tar.gz
 	@echo "Running interactive setup script on $(NAME)..."
 	@multipass exec $(NAME) -- sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh
 
 deploy-auto:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME) (non-interactive)"
-	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
+	@echo "Creating deployment archive (excluding .git)..."
+	@tar --exclude='.git' --exclude='*.tar.gz' -czf /tmp/ubuntu-multipass-setup.tar.gz .
+	@multipass transfer /tmp/ubuntu-multipass-setup.tar.gz $(NAME):/tmp/
+	@multipass exec $(NAME) -- bash -c 'cd /home/ubuntu && rm -rf ubuntu-multipass-setup && tar -xzf /tmp/ubuntu-multipass-setup.tar.gz && mkdir -p ubuntu-multipass-setup && mv * ubuntu-multipass-setup/ 2>/dev/null || true'
+	@multipass exec $(NAME) -- rm -f /tmp/ubuntu-multipass-setup.tar.gz
+	@rm -f /tmp/ubuntu-multipass-setup.tar.gz
 	@echo "Running automated setup script on $(NAME)..."
 	@multipass exec $(NAME) -- sudo /home/ubuntu/ubuntu-multipass-setup/setup.sh --yes
 
@@ -113,7 +123,12 @@ deploy-config:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME) with profile: $(PROFILE)"
 	@echo "Checking SSH key availability..."
 	@source scripts/load-config.sh $(PROFILE) >/dev/null
-	@multipass transfer --recursive . $(NAME):ubuntu-multipass-setup/
+	@echo "Creating deployment archive (excluding .git)..."
+	@tar --exclude='.git' --exclude='*.tar.gz' -czf /tmp/ubuntu-multipass-setup.tar.gz .
+	@multipass transfer /tmp/ubuntu-multipass-setup.tar.gz $(NAME):/tmp/
+	@multipass exec $(NAME) -- bash -c 'cd /home/ubuntu && rm -rf ubuntu-multipass-setup && tar -xzf /tmp/ubuntu-multipass-setup.tar.gz && mkdir -p ubuntu-multipass-setup && mv * ubuntu-multipass-setup/ 2>/dev/null || true'
+	@multipass exec $(NAME) -- rm -f /tmp/ubuntu-multipass-setup.tar.gz
+	@rm -f /tmp/ubuntu-multipass-setup.tar.gz
 	@echo "Running setup script with profile configuration..."
 	@multipass exec $(NAME) -- bash -c ' \
 		source /home/ubuntu/ubuntu-multipass-setup/scripts/load-config.sh $(PROFILE) >/dev/null 2>&1; \
