@@ -18,7 +18,13 @@ test-results/
 # Temp files
 *.tmp
 *.bak
+*.backup
 
 # Build files
 CLAUDE.md
 PLAN.md
+
+# Archives
+*.tar
+*.tar.zip
+*.tar.gz
