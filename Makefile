@@ -6,6 +6,10 @@
 PROFILE ?= default
 CONFIG_LOADED := $(shell source scripts/load-config.sh $(PROFILE) >/dev/null 2>&1 && echo "yes" || echo "no")
 
+# Network interface for bridged networking (can be overridden)
+NETWORK_INTERFACE ?= en0
+ENABLE_NETWORK ?= false
+
 # Set defaults if config loading failed
 ifeq ($(CONFIG_LOADED),no)
 MULTIPASS_CPUS ?= 2
@@ -24,7 +28,7 @@ help:
 	@echo "Ubuntu Multipass Setup - Available Commands:"
 	@echo ""
 	@echo "Basic Commands:"
-	@echo "  make create NAME=myapp            - Create instance with default settings"
+	@echo "  make create NAME=myapp            - Create instance (prompts for network setup)"
 	@echo "  make deploy NAME=myapp            - Deploy with interactive config"
 	@echo "  make deploy-auto NAME=myapp       - Deploy with automatic config"
 	@echo "  make all NAME=myapp               - Create + deploy interactively"
@@ -47,6 +51,10 @@ help:
 	@echo "  make test                         - Run tests (if available)"
 	@echo "  make lint                         - Check shell scripts with shellcheck"
 	@echo "  make clean NAME=myapp             - Delete multipass instance"
+	@echo ""
+	@echo "Network Configuration:"
+	@echo "  All create commands prompt for network setup during instance creation"
+	@echo "  ⚠️  WARNING: Network settings are PERMANENT and cannot be changed after creation!"
 	@echo ""
 	@echo "Available Profiles: default, dev, production, personal, testing"
 	@echo "Default resources: $(MULTIPASS_CPUS) CPUs, $(MULTIPASS_MEMORY) memory, $(MULTIPASS_DISK) disk"
@@ -83,19 +91,185 @@ show-config:
 	fi
 
 create:
+	@if [ -z "$(NAME)" ]; then \
+		echo "❌ ERROR: NAME parameter is required"; \
+		echo "Usage: make create NAME=myapp"; \
+		exit 1; \
+	fi
 	@echo "Creating multipass instance: $(NAME)"
 	@echo "Resources: $(MULTIPASS_CPUS) CPUs, $(MULTIPASS_MEMORY) memory, $(MULTIPASS_DISK) disk"
-	@multipass launch --name $(NAME) --cpus $(MULTIPASS_CPUS) --memory $(MULTIPASS_MEMORY) --disk $(MULTIPASS_DISK)
-	@echo "Instance $(NAME) created successfully"
+	@read -p "Would you like to enable external SSH/Network access? (Cannot be changed later) [y/N]: " enable_network; \
+	if [ "$$enable_network" = "y" ] || [ "$$enable_network" = "Y" ]; then \
+		if ! command -v networksetup >/dev/null 2>&1; then \
+			echo ""; \
+			echo "❌ ERROR: networksetup command not found"; \
+			echo "This feature requires macOS. For other platforms, please create instances without bridged networking."; \
+			exit 1; \
+		fi; \
+		echo ""; \
+		echo "⚠️  Network support is ONLY available on wired (ethernet) connections."; \
+		echo ""; \
+		echo "Available ethernet interfaces:"; \
+		echo "Name"; \
+		echo "----"; \
+		networksetup -listallhardwareports 2>/dev/null | \
+		grep -A2 "Hardware Port:" | \
+		grep -E "Hardware Port:|Device:" | \
+		sed 'N;s/Hardware Port: \(.*\)\nDevice: \(.*\)/\2 \1/' | \
+		while read device desc; do \
+			if [ -n "$$device" ]; then \
+				case "$$desc" in \
+					*Ethernet*) echo "$$device" ;; \
+				esac; \
+			fi; \
+		done | head -10; \
+		echo ""; \
+		ethernet_found=$$(networksetup -listallhardwareports 2>/dev/null | \
+		grep -A1 "Hardware Port.*Ethernet" | \
+		grep "Device:" | \
+		head -1 | \
+		cut -d' ' -f2); \
+		if [ -z "$$ethernet_found" ]; then \
+			echo "❌ No ethernet interfaces found. Network bridging requires ethernet connection."; \
+			echo "   Create instance without network bridging using: make create NAME=$(NAME)"; \
+			exit 1; \
+		fi; \
+		default_interface="$$ethernet_found"; \
+		selected_interface=""; \
+		while [ -z "$$selected_interface" ]; do \
+			read -p "Which ethernet interface would you like to use? (default: $$default_interface): " user_interface; \
+			test_interface=$${user_interface:-$$default_interface}; \
+			valid_interface=$$(networksetup -listallhardwareports 2>/dev/null | \
+			grep -B1 "Device: $$test_interface" | \
+			grep "Hardware Port.*Ethernet" >/dev/null && echo "valid"); \
+			if [ "$$valid_interface" = "valid" ]; then \
+				selected_interface="$$test_interface"; \
+			else \
+				echo "❌ Invalid ethernet interface: $$test_interface"; \
+				echo "   Please choose from the ethernet interfaces listed above."; \
+				echo ""; \
+			fi; \
+		done; \
+		echo ""; \
+		echo "✅ Selected ethernet interface: $$selected_interface"; \
+		echo "Creating instance with bridged networking..."; \
+		multipass launch --name $(NAME) \
+			--cpus $(MULTIPASS_CPUS) \
+			--memory $(MULTIPASS_MEMORY) \
+			--disk $(MULTIPASS_DISK) \
+			--network name=$$selected_interface,mode=auto; \
+		echo "✅ Instance $(NAME) created successfully with bridged networking on $$selected_interface"; \
+		echo "Getting network information..."; \
+		sleep 3; \
+		instance_ip=$$(multipass info $(NAME) 2>/dev/null | grep IPv4 | awk '{print $$2}' | head -1); \
+		if [ -n "$$instance_ip" ]; then \
+			echo "Access via ubuntu@$$instance_ip"; \
+		else \
+			echo "IP address will be available shortly - check with: multipass info $(NAME)"; \
+		fi; \
+	else \
+		echo "Creating standard instance without external network access..."; \
+		multipass launch --name $(NAME) \
+			--cpus $(MULTIPASS_CPUS) \
+			--memory $(MULTIPASS_MEMORY) \
+			--disk $(MULTIPASS_DISK); \
+		echo "✅ Instance $(NAME) created successfully (host-only access)"; \
+	fi
+	@echo ""
+	@echo "Instance Information:"
+	@echo "==================="
+	@multipass info $(NAME)
 
 create-config:
+	@if [ -z "$(NAME)" ]; then \
+		echo "❌ ERROR: NAME parameter is required"; \
+		echo "Usage: make create-config NAME=myapp PROFILE=dev"; \
+		exit 1; \
+	fi
 	@echo "Creating multipass instance: $(NAME) with profile: $(PROFILE)"
 	@bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo "Resources: $$MULTIPASS_CPUS CPUs, $$MULTIPASS_MEMORY memory, $$MULTIPASS_DISK disk"'
-	@multipass launch --name $(NAME) \
-		--cpus $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_CPUS') \
-		--memory $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_MEMORY') \
-		--disk $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_DISK')
-	@echo "Instance $(NAME) created successfully with $(PROFILE) profile"
+	@read -p "Would you like to enable external SSH/Network access? (Cannot be changed later) [y/N]: " enable_network; \
+	if [ "$$enable_network" = "y" ] || [ "$$enable_network" = "Y" ]; then \
+		if ! command -v networksetup >/dev/null 2>&1; then \
+			echo ""; \
+			echo "❌ ERROR: networksetup command not found"; \
+			echo "This feature requires macOS. For other platforms, please create instances without bridged networking."; \
+			exit 1; \
+		fi; \
+		echo ""; \
+		echo "⚠️  Network support is ONLY available on wired (ethernet) connections."; \
+		echo ""; \
+		echo "Available ethernet interfaces:"; \
+		echo "Name"; \
+		echo "----"; \
+		networksetup -listallhardwareports 2>/dev/null | \
+		grep -A2 "Hardware Port:" | \
+		grep -E "Hardware Port:|Device:" | \
+		sed 'N;s/Hardware Port: \(.*\)\nDevice: \(.*\)/\2 \1/' | \
+		while read device desc; do \
+			if [ -n "$$device" ]; then \
+				case "$$desc" in \
+					*Ethernet*) echo "$$device" ;; \
+				esac; \
+			fi; \
+		done | head -10; \
+		echo ""; \
+		ethernet_found=$$(networksetup -listallhardwareports 2>/dev/null | \
+		grep -A1 "Hardware Port.*Ethernet" | \
+		grep "Device:" | \
+		head -1 | \
+		cut -d' ' -f2); \
+		if [ -z "$$ethernet_found" ]; then \
+			echo "❌ No ethernet interfaces found. Network bridging requires ethernet connection."; \
+			echo "   Create instance without network bridging by choosing 'N' when prompted."; \
+			exit 1; \
+		fi; \
+		default_interface="$$ethernet_found"; \
+		selected_interface=""; \
+		while [ -z "$$selected_interface" ]; do \
+			read -p "Which ethernet interface would you like to use? (default: $$default_interface): " user_interface; \
+			test_interface=$${user_interface:-$$default_interface}; \
+			valid_interface=$$(networksetup -listallhardwareports 2>/dev/null | \
+			grep -B1 "Device: $$test_interface" | \
+			grep "Hardware Port.*Ethernet" >/dev/null && echo "valid"); \
+			if [ "$$valid_interface" = "valid" ]; then \
+				selected_interface="$$test_interface"; \
+			else \
+				echo "❌ Invalid ethernet interface: $$test_interface"; \
+				echo "   Please choose from the ethernet interfaces listed above."; \
+				echo ""; \
+			fi; \
+		done; \
+		echo ""; \
+		echo "✅ Selected ethernet interface: $$selected_interface"; \
+		echo "Creating instance with bridged networking..."; \
+		multipass launch --name $(NAME) \
+			--cpus $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_CPUS') \
+			--memory $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_MEMORY') \
+			--disk $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_DISK') \
+			--network name=$$selected_interface,mode=auto; \
+		echo "✅ Instance $(NAME) created successfully with $(PROFILE) profile and bridged networking on $$selected_interface"; \
+		echo "Getting network information..."; \
+		sleep 3; \
+		instance_ip=$$(multipass info $(NAME) 2>/dev/null | grep IPv4 | awk '{print $$2}' | head -1); \
+		if [ -n "$$instance_ip" ]; then \
+			echo "Access via ubuntu@$$instance_ip"; \
+		else \
+			echo "IP address will be available shortly - check with: multipass info $(NAME)"; \
+		fi; \
+	else \
+		echo "Creating standard instance without external network access..."; \
+		multipass launch --name $(NAME) \
+			--cpus $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_CPUS') \
+			--memory $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_MEMORY') \
+			--disk $$(bash -c 'source scripts/load-config.sh $(PROFILE) >/dev/null && echo $$MULTIPASS_DISK'); \
+		echo "✅ Instance $(NAME) created successfully with $(PROFILE) profile (host-only access)"; \
+	fi
+	@echo ""
+	@echo "Instance Information:"
+	@echo "==================="
+	@multipass info $(NAME)
+
 
 deploy:
 	@echo "Deploying ubuntu-multipass-setup to instance: $(NAME)"
@@ -187,6 +361,7 @@ all-auto: create deploy-auto
 
 all-config: create-config deploy-config
 	@echo "Instance $(NAME) created and configured with $(PROFILE) profile!"
+
 
 clean:
 	@echo "Deleting multipass instance: $(NAME)"
