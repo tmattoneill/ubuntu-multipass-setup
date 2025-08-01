@@ -4,6 +4,12 @@ A comprehensive, production-ready Ubuntu server setup script designed for automa
 
 ## 🚀 Quick Start
 
+### Requirements
+* Multipass VM installed locally (https://canonical.com/multipass)
+* 16GB Memory (the more the merrier)
+* 100GB Free HDD disk space
+* 2 Free CPUs
+
 ### One-Command Setup (Recommended)
 ```bash
 # Clone repository
