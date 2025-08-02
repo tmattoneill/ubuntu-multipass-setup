@@ -17,6 +17,66 @@ source "${SCRIPT_DIR}/lib/security.sh"
 readonly MODULE_NAME="nodejs"
 readonly MODULE_DESCRIPTION="Node.js Environment Setup"
 
+# Clean up npm configurations that conflict with NVM
+clean_npm_configs() {
+    log_info "Cleaning up npm configurations that conflict with NVM"
+    
+    # Get all user home directories to check
+    local users=("$PRIMARY_USER" "$DEFAULT_DEPLOY_USER")
+    if user_exists "ubuntu" && [[ "$PRIMARY_USER" != "ubuntu" ]]; then
+        users+=("ubuntu")
+    fi
+    
+    for username in "${users[@]}"; do
+        if ! user_exists "$username"; then
+            continue
+        fi
+        
+        local home_dir
+        home_dir=$(getent passwd "$username" | cut -d: -f6)
+        local npmrc="${home_dir}/.npmrc"
+        
+        if [[ -f "$npmrc" ]]; then
+            log_info "Checking .npmrc for user: $username"
+            
+            # Backup the original
+            backup_file "$npmrc"
+            
+            # Remove conflicting settings
+            if grep -q "prefix\|globalconfig" "$npmrc" 2>/dev/null; then
+                log_info "Removing conflicting npm settings from $npmrc"
+                sed -i '/^prefix=/d; /^globalconfig=/d' "$npmrc"
+                chown "$username:$username" "$npmrc"
+                log_success "Cleaned npm configuration for user: $username"
+            else
+                log_debug "No conflicting npm settings found for user: $username"
+            fi
+        fi
+        
+        # Also run npm config delete commands as the user to be sure
+        sudo -u "$username" bash -c "
+            source $NVM_PROFILE 2>/dev/null || true
+            npm config delete prefix 2>/dev/null || true
+            npm config delete globalconfig 2>/dev/null || true
+        " 2>/dev/null || true
+        
+        # Run the delete-prefix command if Node.js is available
+        local node_version
+        node_version=$(sudo -u "$username" bash -c "source $NVM_PROFILE 2>/dev/null && nvm current 2>/dev/null" || echo "")
+        if [[ -n "$node_version" && "$node_version" != "none" ]]; then
+            sudo -u "$username" bash -c "
+                source $NVM_PROFILE 2>/dev/null || true
+                nvm use --delete-prefix $node_version --silent 2>/dev/null || true
+            " 2>/dev/null || true
+            log_debug "Ran delete-prefix command for user: $username"
+        fi
+    done
+    
+    # Also clean up any global npm prefix settings
+    unset NPM_CONFIG_PREFIX
+    export NPM_CONFIG_PREFIX=""
+}
+
 main() {
     log_section "Module: $MODULE_DESCRIPTION"
     
@@ -162,6 +222,9 @@ install_nodejs() {
         log_error "Could not determine installed Node.js version"
         return 1
     fi
+    
+    # Clean up any conflicting npm configurations
+    clean_npm_configs
     
     # Use the installed version
     if nvm use "$node_version" > /dev/null 2>&1; then
@@ -339,7 +402,8 @@ setup_npm_for_user() {
     # Configure npm for user
     sudo -u "$username" bash -c "
         source $NVM_PROFILE 2>/dev/null || true
-        npm config set prefix '$npm_global_dir'
+        # Remove any existing prefix setting to avoid NVM conflicts
+        npm config delete prefix 2>/dev/null || true
         npm config set fund false
         npm config set audit-level moderate
     " > /dev/null 2>&1 || true

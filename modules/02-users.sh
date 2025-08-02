@@ -231,9 +231,8 @@ export EDITOR=nano
 export PAGER=less
 export LESS='-R'
 
-# Node.js and npm configuration
-export NPM_CONFIG_PREFIX="$HOME/.npm-global"
-export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+# Node.js and npm configuration (handled by NVM)
+# Note: NPM_CONFIG_PREFIX conflicts with NVM, so we don't set it here
 
 # Python configuration
 export PYTHONDONTWRITEBYTECODE=1

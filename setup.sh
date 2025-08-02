@@ -345,10 +345,62 @@ gather_user_information() {
         fi
     fi
     
-    # If no key was pasted, check for local keys as fallback
+    # If no key was pasted, offer to copy from local SSH key files
     if [[ -z "${USER_SSH_PUBLIC_KEY:-}" ]]; then
         echo
-        echo "Checking for SSH keys on this machine..."
+        echo "Would you like to copy from a local SSH key file?"
+        
+        # Quick check for common key files
+        local common_keys=("id_ed25519.pub" "id_rsa.pub" "id_ecdsa.pub")
+        local available_keys=()
+        
+        # Use the original user's home directory (before sudo)
+        local user_home="${SUDO_USER:-$USER}"
+        if [[ -n "$SUDO_USER" ]]; then
+            user_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+        else
+            user_home="$HOME"
+        fi
+        
+        for key in "${common_keys[@]}"; do
+            if [[ -f "$user_home/.ssh/$key" ]]; then
+                available_keys+=("$key")
+            fi
+        done
+        
+        if [[ ${#available_keys[@]} -gt 0 ]]; then
+            echo "Found SSH public keys:"
+            for i in "${!available_keys[@]}"; do
+                echo "  $((i+1)). Copy from: ~/.ssh/${available_keys[$i]}"
+            done
+            echo "  $((${#available_keys[@]}+1)). No, check for other keys on this machine"
+            echo "  $((${#available_keys[@]}+2)). Skip for now"
+            
+            read -p "Choose option (1-$((${#available_keys[@]}+2))): " copy_choice
+            
+            if [[ "$copy_choice" -ge 1 && "$copy_choice" -le ${#available_keys[@]} ]]; then
+                # Copy the selected key
+                local selected_key="${available_keys[$((copy_choice-1))]}"
+                local key_path="$user_home/.ssh/$selected_key"
+                USER_SSH_PUBLIC_KEY=$(cat "$key_path")
+                echo "✅ Copied SSH key from: $user_home/.ssh/$selected_key"
+                local key_comment=$(echo "$USER_SSH_PUBLIC_KEY" | cut -d' ' -f3 2>/dev/null || echo "")
+                echo "Key comment: ${key_comment:-[no comment]}"
+            elif [[ "$copy_choice" -eq $((${#available_keys[@]}+1)) ]]; then
+                # Continue to the existing key discovery logic
+                echo "Checking for SSH keys on this machine..."
+            else
+                # Skip
+                echo "Skipping SSH key setup for now."
+                USER_SSH_PUBLIC_KEY=""
+            fi
+        else
+            echo "No common SSH keys found. Checking for SSH keys on this machine..."
+        fi
+    fi
+    
+    # If still no key, check for local keys as fallback (original logic)
+    if [[ -z "${USER_SSH_PUBLIC_KEY:-}" ]]; then
         
         local ssh_key_path=""
         local key_types=("id_ed25519" "id_rsa" "id_ecdsa")

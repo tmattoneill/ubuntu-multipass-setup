@@ -76,6 +76,7 @@ install_oh_my_zsh() {
     
     for username in "${users[@]}"; do
         install_oh_my_zsh_for_user "$username"
+        install_powerlevel10k_for_user "$username"
     done
 }
 
@@ -149,6 +150,47 @@ install_oh_my_zsh_for_user() {
     fi
 }
 
+# Install Powerlevel10k theme for specific user
+install_powerlevel10k_for_user() {
+    local username="$1"
+    
+    # Check if user exists
+    if ! user_exists "$username"; then
+        log_warn "User $username does not exist, skipping Powerlevel10k installation"
+        return 0
+    fi
+    
+    local home_dir
+    home_dir=$(getent passwd "$username" | cut -d: -f6)
+    local p10k_theme_dir="${home_dir}/.oh-my-zsh/custom/themes/powerlevel10k"
+    local p10k_config="${home_dir}/.p10k.zsh"
+    
+    log_info "Installing Powerlevel10k theme for user: $username"
+    
+    # Check if already installed
+    if [[ -d "$p10k_theme_dir" ]]; then
+        log_debug "Powerlevel10k already installed for user: $username"
+    else
+        # Clone powerlevel10k theme
+        if sudo -u "$username" git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$p10k_theme_dir" > /dev/null 2>&1; then
+            log_success "Powerlevel10k theme installed for user: $username"
+        else
+            log_warn "Failed to install Powerlevel10k theme for user: $username"
+            return 0  # Don't fail the entire module
+        fi
+    fi
+    
+    # Copy p10k configuration
+    if [[ -f "${SCRIPT_DIR}/configs/p10k/.p10k.zsh" ]]; then
+        cp "${SCRIPT_DIR}/configs/p10k/.p10k.zsh" "$p10k_config"
+        chown "$username:$username" "$p10k_config"
+        chmod 644 "$p10k_config"
+        log_success "Powerlevel10k configuration installed for user: $username"
+    else
+        log_warn "Powerlevel10k config file not found, user will need to run 'p10k configure'"
+    fi
+}
+
 # Configure Zsh for users
 configure_zsh_for_users() {
     log_subsection "Configuring Zsh"
@@ -212,7 +254,7 @@ create_zshrc_config() {
 export ZSH="$home_dir/.oh-my-zsh"
 
 # Set name of the theme to load
-ZSH_THEME="$ZSH_THEME"
+ZSH_THEME="powerlevel10k/powerlevel10k"
 
 # Plugins to load
 plugins=(
@@ -221,6 +263,9 @@ $(printf '    %s\n' "${ZSH_PLUGINS[@]}")
 
 # Load Oh My Zsh
 source \$ZSH/oh-my-zsh.sh
+
+# Load Powerlevel10k configuration
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # User configuration
 
